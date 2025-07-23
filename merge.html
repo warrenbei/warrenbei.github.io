@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .game-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .controls { display: flex; gap: 10px; }
+        .score { font-size: 1.2rem; font-weight: bold; }
+        .grid {
+            display: grid;
+            margin: 0 auto;
+            max-width: 400px;
+            position: relative;
+        }
+        .cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            position: relative;
+            color: transparent;
+        }
+        .cell:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
+        .cell.falling { animation: fallAnimation 0.4s ease forwards; }
+        .cell.new { animation: newCellAnimation 0.3s ease forwards; }
+        .cell.merging { animation: mergeAnimation 0.3s ease forwards; }
+        .cell.disappearing { animation: disappearAnimation 0.3s ease forwards; }
+        .cell.empty { opacity: 0; pointer-events: none; }
+        @keyframes fallAnimation {
+            0% { transform: translateY(var(--fall-distance, -100%)); }
+            100% { transform: translateY(0); }
+        }
+        @keyframes newCellAnimation {
+            0% { transform: scale(0.8); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes mergeAnimation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        @keyframes disappearAnimation {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.5); opacity: 0; }
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        button:hover { background-color: #45a049; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            width: 80%;
+        }
+        .modal h2 { margin-top: 0; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            text-align: left;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .letters {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="score">Score: <span id="score">0</span></div>
+            <div class="controls">
+                <button id="toggleDisplayBtn">Show Numbers</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+        </div>
+        <div id="grid" class="grid"></div>
+    </div>
+    
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h2>Game Settings</h2>
+            <div class="input-group">
+                <label for="rows">Rows (3-8):</label>
+                <input type="number" id="rows" min="3" max="8" value="5">
+            </div>
+            <div class="input-group">
+                <label for="cols">Columns (3-8):</label>
+                <input type="number" id="cols" min="3" max="8" value="5">
+            </div>
+            <div class="input-group">
+                <label for="colors">Colors (3-16):</label>
+                <input type="number" id="colors" min="3" max="16" value="12">
+            </div>
+            <div class="button-group">
+                <button id="cancelSettings">Cancel</button>
+                <button id="saveSettings">Start Game</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <h2 id="gameOverTitle">Game Over</h2>
+            <p id="gameOverMessage">No more valid moves!</p>
+            <div class="score">Final Score: <span id="finalScore">0</span></div>
+            <div class="button-group">
+                <button id="keepPlayingBtn">Keep Playing</button>
+                <button id="newGameBtn">New Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        const state = {
+            grid: [],
+            visualGrid: [],
+            rows: 5,
+            cols: 5,
+            colors: 12,
+            score: 0,
+            largestColorSoFar: 1,
+            letters: 'ABCDEFGHIJKLMNOP'.split(''),
+            animating: false,
+            displayMode: 'letters',
+            cellSize: 0,
+            gapSize: 0,
+            borderRadius: 0,
+            fontSize: 0,
+            hasWon: false
+        };
+        
+        // DOM elements
+        const elements = {
+            grid: document.getElementById('grid'),
+            score: document.getElementById('score'),
+            resetBtn: document.getElementById('resetBtn'),
+            toggleDisplayBtn: document.getElementById('toggleDisplayBtn'),
+            settingsModal: document.getElementById('settingsModal'),
+            cancelSettingsBtn: document.getElementById('cancelSettings'),
+            saveSettingsBtn: document.getElementById('saveSettings'),
+            gameOverModal: document.getElementById('gameOverModal'),
+            gameOverTitle: document.getElementById('gameOverTitle'),
+            gameOverMessage: document.getElementById('gameOverMessage'),
+            finalScore: document.getElementById('finalScore'),
+            newGameBtn: document.getElementById('newGameBtn'),
+            keepPlayingBtn: document.getElementById('keepPlayingBtn')
+        };
+        
+        // Calculate responsive dimensions
+        function calculateDimensions() {
+            const containerWidth = Math.min(400, elements.grid.parentElement.clientWidth - 40);
+            state.cellSize = Math.max(30, Math.min(150, Math.floor(containerWidth / state.cols)));
+            state.gapSize = Math.max(4, Math.floor(state.cellSize * 0.1));
+            state.borderRadius = Math.max(4, Math.floor(state.cellSize * 0.15));
+            state.fontSize = Math.max(12, Math.floor(state.cellSize * 0.6));
+            elements.grid.style.gridTemplateColumns = `repeat(${state.cols}, 1fr)`;
+            elements.grid.style.gap = `${state.gapSize}px`;
+        }
+        
+        // Initialize the game
+        function initGame() {
+            state.grid = Array(state.rows).fill().map(() => Array(state.cols).fill(1));
+            state.visualGrid = Array(state.rows).fill().map(() => 
+                Array(state.cols).fill().map(() => ({ value: 1, state: 'normal' }))
+            );
+            state.score = 0;
+            state.largestColorSoFar = 1;
+            state.animating = false;
+            state.hasWon = false;
+            calculateDimensions();
+            updateScore();
+            renderGrid();
+            if (!hasValidMoves()) {
+                showGameOver(false);
+            }
+        }
+        
+        // Update score display
+        function updateScore() {
+            elements.score.textContent = state.displayMode === 'letters' 
+                ? state.letters[state.largestColorSoFar-1] + state.score
+                : state.largestColorSoFar + ' | ' + state.score;
+        }
+        
+        // Generate a new cell color with weighted distribution
+        function generateNewCellColor() {
+            const rand = Math.random();
+            return 1 + Math.floor(1.7 * Math.pow(-Math.log(rand), 0.8)) % state.largestColorSoFar;
+        }
+        
+        // Render the grid
+        function renderGrid() {
+            elements.grid.innerHTML = '';
+            for (let row = 0; row < state.rows; row++) {
+                for (let col = 0; col < state.cols; col++) {
+                    const visualCell = state.visualGrid[row][col];
+                    const cellValue = visualCell.value;
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.style.borderRadius = `${state.borderRadius}px`;
+                    if (visualCell.state !== 'normal') {
+                        cell.classList.add(visualCell.state);
+                        if (visualCell.state === 'falling') {
+                            cell.style.setProperty('--fall-distance', `${(visualCell.fromRow - row) * 100}%`);
+                        }
+                    }
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    if (visualCell.state !== 'empty') {
+                        const hue = (360 / state.colors) * (cellValue - 1);
+                        cell.style.backgroundColor = `hsl(${hue}, 100%, 50%)`;
+                        if (state.displayMode !== 'none' && (cellValue - 1) < state.letters.length) {
+                            const letterSpan = document.createElement('span');
+                            letterSpan.className = 'letters';
+                            letterSpan.textContent = state.displayMode === 'letters' 
+                                ? state.letters[cellValue - 1] 
+                                : cellValue;
+                            letterSpan.style.fontSize = `${state.fontSize}px`;
+                            cell.appendChild(letterSpan);
+                        }
+                    }
+                    if (!state.animating && visualCell.state === 'normal') {
+                        if (!(state.hasWon && cellValue === state.colors)) {
+                            cell.addEventListener('click', handleCellClick);
+                        } else {
+                            cell.style.cursor = 'not-allowed';
+                        }
+                    }
+                    elements.grid.appendChild(cell);
+                }
+            }
+        }
+        
+        // Find all connected cells of the same color using DFS
+        function findConnectedCells(row, col, color, visited = new Set()) {
+            const key = `${row},${col}`;
+            if (
+                row < 0 || row >= state.rows || 
+                col < 0 || col >= state.cols || 
+                state.grid[row][col] !== color ||
+                visited.has(key)
+            ) {
+                return visited;
+            }
+            visited.add(key);
+            [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+                findConnectedCells(row + dr, col + dc, color, visited);
+            });
+            return visited;
+        }
+        
+        // Handle cell click
+        function handleCellClick(event) {
+            if (state.animating) return;
+            const row = parseInt(event.currentTarget.dataset.row);
+            const col = parseInt(event.currentTarget.dataset.col);
+            const color = state.grid[row][col];
+            if (state.hasWon && color === state.colors) return;
+            const connected = findConnectedCells(row, col, color);
+            if (connected.size >= 2) {
+                state.animating = true;
+                const newColor = color + 1;
+                state.grid[row][col] = newColor;
+                state.visualGrid[row][col] = { value: newColor, state: 'merging' };
+                if (newColor > state.largestColorSoFar) {
+                    state.largestColorSoFar = newColor;
+                }
+                connected.forEach(key => {
+                    if (key !== `${row},${col}`) {
+                        const [r, c] = key.split(',').map(Number);
+                        state.visualGrid[r][c] = { value: state.grid[r][c], state: 'disappearing' };
+                        state.grid[r][c] = 0;
+                    }
+                });
+                state.score += connected.size * Math.pow(2, color-1);
+                updateScore();
+                renderGrid();
+                setTimeout(processAnimationStep1, 300);
+            }
+        }
+        
+        // Process animation steps
+        function processAnimationStep1() {
+            for (let row = 0; row < state.rows; row++) {
+                for (let col = 0; col < state.cols; col++) {
+                    if (state.visualGrid[row][col].state === 'disappearing') {
+                        state.visualGrid[row][col] = { value: 0, state: 'empty' };
+                    } else if (state.visualGrid[row][col].state === 'merging') {
+                        state.visualGrid[row][col].state = 'normal';
+                    }
+                }
+            }
+            applyGravity();
+            renderGrid();
+            setTimeout(processAnimationStep2, 400);
+        }
+        
+        function processAnimationStep2() {
+            for (let row = 0; row < state.rows; row++) {
+                for (let col = 0; col < state.cols; col++) {
+                    if (state.visualGrid[row][col].state === 'falling') {
+                        state.visualGrid[row][col].state = 'normal';
+                    }
+                }
+            }
+            fillEmptySpaces();
+            renderGrid();
+            setTimeout(processAnimationStep3, 300);
+        }
+        
+        function processAnimationStep3() {
+            for (let row = 0; row < state.rows; row++) {
+                for (let col = 0; col < state.cols; col++) {
+                    if (state.visualGrid[row][col].state === 'new') {
+                        state.visualGrid[row][col].state = 'normal';
+                    }
+                }
+            }
+            state.animating = false;
+            renderGrid();
+            if (state.largestColorSoFar >= state.colors && !state.hasWon) {
+                state.hasWon = true;
+                showGameOver(true);
+                return;
+            }
+            if (!hasValidMoves()) {
+                showGameOver(false);
+            }
+        }
+        
+        // Apply gravity to the cells
+        function applyGravity() {
+            const moves = [];
+            for (let col = 0; col < state.cols; col++) {
+                let emptyRow = -1;
+                for (let row = state.rows - 1; row >= 0; row--) {
+                    if (state.grid[row][col] === 0 && emptyRow === -1) {
+                        emptyRow = row;
+                    } 
+                    else if (state.grid[row][col] !== 0 && emptyRow !== -1) {
+                        moves.push({
+                            fromRow: row,
+                            fromCol: col,
+                            toRow: emptyRow,
+                            toCol: col,
+                            value: state.grid[row][col]
+                        });
+                        state.grid[emptyRow][col] = state.grid[row][col];
+                        state.grid[row][col] = 0;
+                        emptyRow--;
+                        for (let r = emptyRow; r >= row; r--) {
+                            if (state.grid[r][col] === 0) {
+                                emptyRow = r;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            moves.forEach(move => {
+                state.visualGrid[move.toRow][move.toCol] = {
+                    value: move.value,
+                    state: 'falling',
+                    fromRow: move.fromRow,
+                    fromCol: move.fromCol
+                };
+                if (state.visualGrid[move.fromRow][move.fromCol].state !== 'empty') {
+                    state.visualGrid[move.fromRow][move.fromCol] = { value: 0, state: 'empty' };
+                }
+            });
+        }
+        
+        // Fill empty spaces with new cells
+        function fillEmptySpaces() {
+            for (let row = 0; row < state.rows; row++) {
+                for (let col = 0; col < state.cols; col++) {
+                    if (state.grid[row][col] === 0) {
+                        const newColor = generateNewCellColor();
+                        state.grid[row][col] = newColor;
+                        state.visualGrid[row][col] = { value: newColor, state: 'new' };
+                    }
+                }
+            }
+        }
+        
+        // Check if there are valid moves
+        function hasValidMoves() {
+            const visited = new Set();
+            for (let row = 0; row < state.rows; row++) {
+                for (let col = 0; col < state.cols; col++) {
+                    const key = `${row},${col}`;
+                    if (!visited.has(key)) {
+                        const color = state.grid[row][col];
+                        if (color !== 0) {
+                            if (state.hasWon && color === state.colors) {
+                                visited.add(key);
+                                continue;
+                            }
+                            const connected = findConnectedCells(row, col, color);
+                            connected.forEach(cell => visited.add(cell));
+                            if (connected.size >= 2) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        // Show the game over modal
+        function showGameOver(isWin) {
+            elements.gameOverTitle.textContent = isWin ? "You Win!" : "Game Over";
+            elements.gameOverMessage.textContent = isWin 
+                ? "Congratulations! You've reached the final color!" 
+                : "No valid moves left!";
+            updateScore();
+            elements.finalScore.textContent = elements.score.textContent;
+            elements.keepPlayingBtn.style.display = isWin ? 'block' : 'none';
+            const buttonGroup = elements.gameOverModal.querySelector('.button-group');
+            buttonGroup.innerHTML = '';
+            if (isWin) {
+                buttonGroup.appendChild(elements.keepPlayingBtn);
+                buttonGroup.appendChild(elements.newGameBtn);
+            } else {
+                const spacer = document.createElement('div');
+                spacer.style.visibility = 'hidden';
+                buttonGroup.appendChild(spacer);
+                buttonGroup.appendChild(elements.newGameBtn);
+            }
+            elements.gameOverModal.style.display = 'flex';
+        }
+        
+        // Toggle display mode
+        function toggleDisplayMode() {
+            if (state.displayMode === 'letters') {
+                state.displayMode = 'numbers';
+                elements.toggleDisplayBtn.textContent = "Show None";
+            } else if (state.displayMode === 'numbers') {
+                state.displayMode = 'none';
+                elements.toggleDisplayBtn.textContent = "Show Letters";
+            } else {
+                state.displayMode = 'letters';
+                elements.toggleDisplayBtn.textContent = "Show Numbers";
+            }
+            updateScore();
+            renderGrid();
+        }
+        
+        // Event listeners
+        elements.resetBtn.addEventListener('click', () => elements.settingsModal.style.display = 'flex');
+        elements.toggleDisplayBtn.addEventListener('click', toggleDisplayMode);
+        elements.cancelSettingsBtn.addEventListener('click', () => elements.settingsModal.style.display = 'none');
+        
+        elements.saveSettingsBtn.addEventListener('click', () => {
+            const rows = parseInt(document.getElementById('rows').value);
+            const cols = parseInt(document.getElementById('cols').value);
+            const colors = parseInt(document.getElementById('colors').value);
+            state.rows = Math.max(3, Math.min(8, rows));
+            state.cols = Math.max(3, Math.min(8, cols));
+            state.colors = Math.max(3, Math.min(16, colors));
+            elements.settingsModal.style.display = 'none';
+            initGame();
+        });
+        
+        elements.newGameBtn.addEventListener('click', () => {
+            elements.gameOverModal.style.display = 'none';
+            elements.settingsModal.style.display = 'flex';
+        });
+        
+        elements.keepPlayingBtn.addEventListener('click', () => {
+            elements.gameOverModal.style.display = 'none';
+            renderGrid();
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            calculateDimensions();
+            renderGrid();
+        });
+        
+        // Start the game
+        initGame();
+    </script>
+</body>
+</html>
