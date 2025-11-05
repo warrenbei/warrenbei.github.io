@@ -138,7 +138,7 @@
 
       const keyRepeatDelay = 80,
             accidentalHardDropTime = 200,
-            messageLifetime = 5000;
+            messageLifetime = 2500;
 
       let grid = new Map(),
           piece = null,
@@ -196,12 +196,8 @@
         for (let i = 0; i < steps; i++) [newQ, newR] = [-newR, newQ + newR];
         return { q: newQ, r: newR };
       }
-      function rotatePiece(p, steps) {
-        return {
-          ...p,
-          cells: p.cells.map((c) => rotateCell(c.q, c.r, steps)),
-        };
-      }
+      const rotatePiece = (p, steps) => ({ ...p,
+        cells: p.cells.map((c) => rotateCell(c.q, c.r, steps)) });
       function tryRotatePiece(p, steps) {
         const rotated = rotatePiece(p, steps);
         const kicks = KICK_TABLE[steps];
@@ -223,10 +219,8 @@
       function getDroppedPiece(p) {
         let np = { ...p, pos: { ...p.pos } };
         while (true) {
-          const c = {
-            ...np,
-            pos: { q: np.pos.q + DIR.DOWN.q, r: np.pos.r + DIR.DOWN.r },
-          };
+          const c = { ...np,
+            pos: { q: np.pos.q + DIR.DOWN.q, r: np.pos.r + DIR.DOWN.r } };
           if (collides(c)) break;
           np = c;
         }
@@ -240,49 +234,41 @@
         else spawnPiece();
         gravityTimer = 0;
       }
+
       const worldCells = (p) =>
         p.cells.map((c) => ({ q: c.q + p.pos.q, r: c.r + p.pos.r }));
-
       function cloneGrid(g) {
         const m = new Map();
         for (const [k,v] of g.entries()) m.set(k, v);
         return m;
       }
-      function clonePieceObj(p) {
-        if (!p) return null;
-        return {
-          type: p.type,
-          pos: { q: p.pos.q, r: p.pos.r },
-          cells: p.cells.map(c => ({ q: c.q, r: c.r })),
-          color: p.color,
-          name: p.name
-        };
-      }
-      function cloneQueue(qarr) {
-        return qarr.map(clonePieceObj);
-      }
+      const clonePieceObj = (p) => !p ? null : {
+        type: p.type,
+        pos: { q: p.pos.q, r: p.pos.r },
+        cells: p.cells.map(c => ({ q: c.q, r: c.r })),
+        color: p.color,
+        name: p.name,
+      };
 
-      function pushSnapshot() {
-        snapshots.push({
-          grid: cloneGrid(grid),
-          piece: clonePieceObj(piece),
-          queue: cloneQueue(queue),
-          bag: [...bag],
-          holdPiece: clonePieceObj(holdPiece),
-          canHold,
-          linesCleared,
-          lockDelayEnd,
-          piecesPlaced,
-          b2b,
-          combo,
-          totalAttack,
-        });
-      }
+      const pushSnapshot = () => snapshots.push({
+        grid: cloneGrid(grid),
+        piece: clonePieceObj(piece),
+        queue: queue.map(clonePieceObj),
+        bag: [...bag],
+        holdPiece: clonePieceObj(holdPiece),
+        canHold,
+        linesCleared,
+        lockDelayEnd,
+        piecesPlaced,
+        b2b,
+        combo,
+        totalAttack,
+      });
       function restoreSnapshot(snapshot) {
         if (!snapshot) return;
         grid = cloneGrid(snapshot.grid);
         piece = clonePieceObj(snapshot.piece);
-        queue = cloneQueue(snapshot.queue);
+        queue = snapshot.queue.map(clonePieceObj);
         bag = [...snapshot.bag];
         holdPiece = clonePieceObj(snapshot.holdPiece);
         canHold = snapshot.canHold;
@@ -310,17 +296,19 @@
         restoreSnapshot(previous);
       }
 
-      const key = (q, r) => q + "," + r,
-            occupied = (q, r) => grid.has(key(q, r));
+      const key = (q, r) => q + "," + r;
+      const occupied = (q, r) => grid.has(key(q, r));
+      const collides = (p) => worldCells(p).some((c) =>
+              !inBounds(c.q, c.r) || occupied(c.q, c.r));
       const addToGrid = (cells, color) => {
         for (const c of cells) grid.set(key(c.q, c.r), color);
       };
-      const drawGrid = () => {
+      function drawGrid() {
         for (const [k, color] of grid) {
           const [q, r] = k.split(",").map(Number);
           drawHex(q, r, color);
         }
-      };
+      }
 
       function refillBag() {
         bag = [...Array(TETRAHEXES.length).keys()];
@@ -329,22 +317,20 @@
           [bag[i], bag[t]] = [bag[t], bag[i]];
         }
       }
-      const nextPieceIndex = () => {
+      function nextPieceIndex() {
         if (!bag.length) refillBag();
         return bag.pop();
-      };
-      function makePiece(idx) {
-        return {
+      }
+      const makePiece = (idx) => ({
           type: idx,
           pos: { q: 0, r: 2 },
           cells: TETRAHEXES[idx].map((c) => ({ ...c })),
           color: TETRAHEX_COLORS[idx],
           name: TETRAHEX_NAMES[idx],
-        };
-      }
-      function fillQueue() {
+        });
+      const fillQueue = () => {
         while (queue.length < 5) queue.push(makePiece(nextPieceIndex()));
-      }
+      };
       function spawnPiece() {
         piece = queue.shift();
         fillQueue();
@@ -354,10 +340,8 @@
         }
       }
 
-      const collides = (p) =>
-        worldCells(p).some((c) => !inBounds(c.q, c.r) || occupied(c.q, c.r));
-      const keys = {},
-            normalizeKey = (e) => (e.key === " " ? "space" : e.key.toLowerCase());
+      const keys = {};
+      const normalizeKey = (e) => (e.key === " " ? "space" : e.key.toLowerCase());
       document.addEventListener("keydown", (e) => {
         const k = normalizeKey(e);
         keys[k] = true;
@@ -386,13 +370,10 @@
           const range = [2 * n - 1, 2 * n];
           const lineCells = occupiedCells.filter(c => range.includes(c.val));
           const allPositions = [];
-          for (let q = -5; q <= 5; q++) {
-            for (let r = -10; r <= 40; r++) {
-              if (!inBounds(q, r)) continue;
-              const val = q + 2 * r;
-              if (range.includes(val)) allPositions.push({ q, r });
-            }
-          }
+          for (let q = -5; q <= 5; q++)
+            for (let r = -10; r <= 40; r++)
+              if (inBounds(q, r) && range.includes(q + 2 * r))
+                allPositions.push({ q, r });
           if (lineCells.length === allPositions.length && allPositions.length > 0)
             linesToClear.push({ n, cells: lineCells });
         }
@@ -415,54 +396,40 @@
         }
         return linesToClear.length;
       }
-      function isSpin(p) {
-        return HEX_DIRS.every(d => collides({
-          ...p,
-          pos: { q: p.pos.q + d.q, r: p.pos.r + d.r }
-        }));
-      }
+      const isSpin = (p) => HEX_DIRS.every(d => collides({
+          ...p, pos: { q: p.pos.q + d.q, r: p.pos.r + d.r } }));
       // note: locking costs a turn
       function computeFinesse() {
-        const reach = new Map(),
+        const reach = new Set(),
               queue = [];
         const startingPiece = makePiece(piece.type);
         const sortCells = (p) =>
           worldCells(p).map(c => `${c.q},${c.r}`).sort().join("|");
         const id = (p) => sortCells(p)+`|${p.pos.q},${p.pos.r}`;
         const target = sortCells(piece);
-        reach.set(id(startingPiece), 0);
+        reach.add(id(startingPiece));
         queue.push([0, startingPiece]);
         while (queue.length) {
-          queue.sort();
           const [d, P] = queue.shift();
-          if (sortCells(P) === target) return reach.get(id(P)) + 1;
+          if (sortCells(P) === target) return d + 1;
           let [goodL, pieceL] = movePiece(P, DIR.LEFT.q, DIR.LEFT.r);
           let [goodR, pieceR] = movePiece(P, DIR.RIGHT.q, DIR.RIGHT.r);
           let [goodD, pieceD] = movePiece(P, DIR.DOWN.q, DIR.DOWN.r);
           let pieceH = getDroppedPiece(P);
-          if (goodL && !reach.has(id(pieceL))) {
-            reach.set(id(pieceL), d + 1);
-            queue.push([d + 1, pieceL]);
-          }
-          if (goodR && !reach.has(id(pieceR))) {
-            reach.set(id(pieceR), d + 1);
-            queue.push([d + 1, pieceR]);
-          }
-          if (goodD && !reach.has(id(pieceD))) {
-            reach.set(id(pieceD), d + 1);
-            queue.push([d + 1, pieceD]);
-          }
+          const insert = (p) => {
+            if (!reach.has(id(p))) {
+              reach.add(id(p));
+              queue.push([d + 1, p]);
+            }
+          };
+          if (goodL) insert(pieceL);
+          if (goodR) insert(pieceR);
+          if (goodD) insert(pieceD);
           if(sortCells(pieceH) === target) return d + 1; // hard drop
-          if (!reach.has(id(pieceH))) {
-            reach.set(id(pieceH), d + 1);
-            queue.push([d + 1, pieceH]);
-          }
+          insert(pieceH);
           for (let i = 1; i <= 5; i += 1) {
             let [good, pieceN] = tryRotatePiece(P, i);
-            if (good && !reach.has(id(pieceN))) {
-              reach.set(id(pieceN), d + 1);
-              queue.push([d + 1, pieceN]);
-            }
+            if (good) insert(pieceN);
           }
         }
         console.log('Finesse search bug');
@@ -497,8 +464,8 @@
           else attack = [0, 0, 1, 2, 4][count];
           if (b2b >= 1) attack += 1;
           totalAttack += attack;
-        } else combo = -1;
-
+        }
+        else combo = -1;
         spawnPiece();
         canHold = true;
         pushSnapshot();
@@ -514,58 +481,36 @@
         }
         const t = Date.now();
         if (t - lastMoveTime > keyRepeatDelay) {
-          if (keys.arrowleft) {
-            let [good, p] = movePiece(piece, DIR.LEFT.q, DIR.LEFT.r);
-            if (good) {
-              piece = p;
-              lastMoveTime = t;
-              gravityTimer = 0;
-              finesseMoves += 1;
-            }
-          }
-          if (keys.arrowright) {
-            let [good, p] = movePiece(piece, DIR.RIGHT.q, DIR.RIGHT.r);
-            if (good) {
-              piece = p;
-              lastMoveTime = t;
-              gravityTimer = 0;
-              finesseMoves += 1;
-            }
-          }
-          if (keys.arrowup) {
-            let [good, p] = movePiece(piece, DIR.DOWN.q, DIR.DOWN.r);
-            if (good) {
-              piece = p;
-              lastMoveTime = t;
-              gravityTimer = 0;
-              finesseMoves += 1;
-            }
-          }
+          const updateTime = () => {
+            lastMoveTime = t;
+            gravityTimer = 0;
+            finesseMoves += 1;
+          };
+          const testKey = (offset) => {
+            let [good, p] = movePiece(piece, offset.q, offset.r);
+            if (!good) return;
+            piece = p;
+            updateTime();
+          };
+          if (keys.arrowleft) testKey(DIR.LEFT);
+          if (keys.arrowright) testKey(DIR.RIGHT);
+          if (keys.arrowup) testKey(DIR.DOWN);
           if (keys.arrowdown && t > lockDelayEnd) {
             const drop = getDroppedPiece(piece);
             if (drop.pos.q !== piece.pos.q || drop.pos.r !== piece.pos.r) {
               piece = drop;
-              lastMoveTime = t;
-              gravityTimer = 0;
-              finesseMoves += 1;
+              updateTime();
             }
           }
           for (const { key, steps } of ROTATION_KEYS) {
             if (keys[key]) {
               let [good, p] = tryRotatePiece(piece, steps);
-              if (good) {
-                piece = p;
-                lastMoveTime = t;
-                gravityTimer = 0;
-                finesseMoves += 1;
-              }
+              if (good) (piece = p), updateTime();
             }
           }
           if (keys.space && t > lockDelayEnd) {
             piece = getDroppedPiece(piece);
-            lastMoveTime = t;
-            gravityTimer = 0;
-            finesseMoves += 1;
+            updateTime();
             lockPieceAndSpawn();
           }
         }
@@ -586,14 +531,13 @@
         }
       }
 
-      function hexToRgba(hex, alpha = 1) {
-        if (!hex) return `rgba(0,0,0,${alpha})`;
+      const hexToRgba = (hex, alpha) => {
         const h = hex.replace("#", "");
         const r = parseInt(h.substring(0, 2), 16);
         const g = parseInt(h.substring(2, 4), 16);
         const b = parseInt(h.substring(4, 6), 16);
         return `rgba(${r},${g},${b},${alpha})`;
-      }
+      };
       function drawQueue() {
         const baseX = canvas.width - 100, baseY = 120;
         for (let i = 0; i < queue.length; i++) {
@@ -695,7 +639,8 @@
           ctx.fillStyle = "#fff";
           ctx.font = "18px monospace";
           ctx.fillText("Game over, R to restart", canvas.width / 2, canvas.height / 2 + 30);
-        } else if (countdown > 0) {
+        }
+        else if (countdown > 0) {
           ctx.fillStyle = "#fff";
           ctx.font = "72px monospace";
           ctx.textAlign = "center";
