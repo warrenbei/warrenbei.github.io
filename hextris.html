@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hextris</title>
+    <style>
+      body {
+        background: #111;
+        display: flex;
+        justify-content: center;
+        flex-direction: column;
+        align-items: center;
+        color: #fff;
+        font-family: monospace;
+      }
+      canvas {
+        background: #222;
+        margin-top: 20px;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 10px;
+      }
+      label { font-size: 14px; }
+      input[type="range"] { width: 220px; }
+      button { background:#333;color:#fff;border:1px solid #555;padding:6px 12px;border-radius:6px;cursor:pointer; }
+      button:hover { background:#555; }
+      #gravityValue { width: 44px; display:inline-block; text-align:center; }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <label for="gravity">Gravity (cells/s):</label>
+      <input id="gravity" type="range" min="0" max="3" step="0.1" value="1.0" />
+      <span id="gravityValue">1.0</span>
+    </div>
+
+    <canvas id="game" width="800" height="750"></canvas>
+    <script>
+      const canvas = document.getElementById("game"),
+            ctx = canvas.getContext("2d");
+      const size = 25;
+
+      const gravitySlider = document.getElementById("gravity");
+      const gravityValue = document.getElementById("gravityValue");
+      let gravitySpeed = parseFloat(gravitySlider.value); // cells / second
+      gravityValue.textContent = gravitySpeed.toFixed(1);
+      gravitySlider.addEventListener("input", () => {
+        gravitySpeed = parseFloat(gravitySlider.value);
+        gravityValue.textContent = gravitySpeed.toFixed(1);
+      });
+
+      const inBounds = (q, r) =>
+        q >= -5 && q <= 5 && q + 2 * r >= 0 && q + 2 * r <= 30;
+      const axialToPixel = (q, r) => [
+        size * (1.5 * q) + canvas.width / 2,
+        size * Math.sqrt(3) * (r + q / 2) + 50,
+      ];
+      function drawHex(q, r, color, fill = true, stroke = "#333") {
+        const [x, y] = axialToPixel(q, r);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = (Math.PI / 180) * (60 * i),
+                px = x + size * Math.cos(a),
+                py = y + size * Math.sin(a);
+          i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.closePath();
+        if (fill) { ctx.fillStyle = color; ctx.fill(); }
+        ctx.strokeStyle = stroke; ctx.stroke();
+      }
+      function drawBackgroundGrid() {
+        for (let q = -5; q <= 5; q++)
+          for (let r = -10; r <= 40; r++)
+            if (inBounds(q, r)) drawHex(q, r, "#272727", q % 2 === 0);
+      }
+
+      const DIR = {
+        LEFT: { q: -1, r: +1 },
+        RIGHT: { q: +1, r: 0 },
+        DOWN: { q: 0, r: +1 },
+      };
+      const HEX_DIRS = [
+        { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+        { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 },
+      ];
+      const TETRAHEXES = [
+        [{ q: -2, r: 0 }, { q: -1, r: 0 }, { q: 0, r: 0 }, { q: 1, r: 0 }], // I
+        [{ q: -1, r: 0 }, { q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: -1 }], // L
+        [{ q: -2, r: 1 }, { q: -1, r: 1 }, { q: 0, r: 0 }, { q: 1, r: -1 }], // J
+        [{ q: -1, r: 0 }, { q: 0, r: 0 }, { q: 1, r: 0 }, { q: 1, r: -1 }], // Q
+        [{ q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 0 }, { q: 1, r: -1 }], // P
+        [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 1, r: -1 }, { q: 1, r: 0 }], // C
+        [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: 0, r: 0 }, { q: 1, r: -1 }], // O
+        [{ q: -1, r: 0 }, { q: 0, r: 0 }, { q: 1, r: -1 }, { q: 2, r: -1 }], // S
+        [{ q: -2, r: 1 }, { q: -1, r: 0 }, { q: 0, r: 0 }, { q: 1, r: -1 }], // Z
+        [{ q: -1, r: 1 }, { q: 0, r: -1 }, { q: 0, r: 0 }, { q: 1, r: 0 }], // Y
+      ];
+      const TETRAHEX_COLORS = [
+        "#00ffff", "#ff9a2e", "#2630e6", "#4b6bff",
+        "#ff4bcb", "#227711", "#ffe84b", "#4bff4b",
+        "#ff4b4b", "#b84bff",
+      ];
+      const TETRAHEX_NAMES = ["I","L","J","Q","P","C","O","S","Z","Y"];
+      /* CW rotations
+             11
+          7     10
+       9     0
+          1     6
+       5     2
+          3     8
+             4
+      */
+      const KICK_TABLE = {
+        1: [{ q: 0, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }, { q: -1, r: 2 },
+            { q: 0, r: 2 }, { q: -2, r: 2 }, { q: 1, r: 0 }, { q: -1, r: 0 },
+            { q: 1, r: 1 }, { q: -2, r: 1 }, { q: 1, r: -1 }, { q: 0, r: -1 }],
+        2: [{ q: 0, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }, { q: -1, r: 2 },
+            { q: 0, r: 2 }, { q: -2, r: 2 }, { q: 1, r: 0 }, { q: -1, r: 0 },
+            { q: 1, r: 1 }, { q: -2, r: 1 }, { q: 1, r: -1 }, { q: 0, r: -1 }],
+        3: [{ q: 0, r: 0 }],
+        5: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: 1 },
+            { q: 0, r: 2 }, { q: 2, r: 0 }, { q: -1, r: 1 }, { q: 1, r: -1 },
+            { q: -1, r: 2 }, {q: 2, r: -1}, { q: -1, r: 0 }, { q: 0, r: -1 }],
+        4: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: 1 },
+            { q: 0, r: 2 }, { q: 2, r: 0 }, { q: -1, r: 1 }, { q: 1, r: -1 },
+            { q: -1, r: 2 }, {q: 2, r: -1}, { q: -1, r: 0 }, { q: 0, r: -1 }],
+      };
+      const ROTATION_KEYS = [
+        { key: "z", steps: 5 },
+        { key: "x", steps: 1 },
+        { key: "a", steps: 3 },
+        { key: "s", steps: 4 },
+        { key: "d", steps: 2 },
+      ];
+
+      const keyRepeatDelay = 80,
+            accidentalHardDropTime = 200,
+            messageLifetime = 5000;
+
+      let grid = new Map(),
+          piece = null,
+          queue = [],
+          bag = [],
+          holdPiece = null,
+          canHold = true,
+          gameOver = false,
+          countdown = 3,
+          countdownStart = Date.now(),
+          gameStartTime = Date.now(),
+          gameEndTime = 0,
+          linesCleared = 0,
+          lockDelayEnd = 0,
+          piecesPlaced = 0,
+          b2b = -1,
+          combo = -1,
+          totalAttack = 0,
+          messageLines = [],
+          messageTimer = 0,
+          gravityTimer = 0,
+          lastMoveTime = 0,
+          lastTime = 0,
+          finesseMoves = 0;
+      let snapshots = [];
+      function resetGame() {
+        grid = new Map();
+        gameOver = false;
+        gravityTimer = lastTime = 0;
+        lastMoveTime = Date.now() + 250 - keyRepeatDelay;
+        refillBag();
+        queue = [];
+        fillQueue();
+        countdown = 3;
+        countdownStart = Date.now();
+        piece = null;
+        holdPiece = null;
+        canHold = true;
+        for (const k in keys) keys[k] = false;
+        gameEndTime = 0;
+        linesCleared = 0;
+        piecesPlaced = 0;
+        combo = -1;
+        b2b = -1;
+        totalAttack = 0;
+        messageLines = [];
+        finesseMoves = 0;
+        spawnPiece();
+        snapshots = [];
+        pushSnapshot();
+      }
+
+      function rotateCell(q, r, steps) {
+        let newQ = q, newR = r;
+        for (let i = 0; i < steps; i++) [newQ, newR] = [-newR, newQ + newR];
+        return { q: newQ, r: newR };
+      }
+      function rotatePiece(p, steps) {
+        return {
+          ...p,
+          cells: p.cells.map((c) => rotateCell(c.q, c.r, steps)),
+        };
+      }
+      function tryRotatePiece(p, steps) {
+        const rotated = rotatePiece(p, steps);
+        const kicks = KICK_TABLE[steps];
+        for (const offset of kicks) {
+          const test = {
+            ...rotated,
+            pos: { q: p.pos.q + offset.q, r: p.pos.r + offset.r }
+          };
+          if (!collides(test)) return [true, test];
+        }
+        return [false, p];
+      }
+      function movePiece(p, dq, dr) {
+        if (!p) return [false, p];
+        const np = { ...p, pos: { q: p.pos.q + dq, r: p.pos.r + dr } };
+        if (collides(np)) return [false, p];
+        return [true, np];
+      }
+      function getDroppedPiece(p) {
+        let np = { ...p, pos: { ...p.pos } };
+        while (true) {
+          const c = {
+            ...np,
+            pos: { q: np.pos.q + DIR.DOWN.q, r: np.pos.r + DIR.DOWN.r },
+          };
+          if (collides(c)) break;
+          np = c;
+        }
+        return np;
+      }
+      function holdCurrentPiece() {
+        if (!piece || !canHold) return;
+        const temp = holdPiece;
+        holdPiece = makePiece(piece.type);
+        if (temp) piece = makePiece(temp.type), canHold = false;
+        else spawnPiece();
+        gravityTimer = 0;
+      }
+      const worldCells = (p) =>
+        p.cells.map((c) => ({ q: c.q + p.pos.q, r: c.r + p.pos.r }));
+
+      function cloneGrid(g) {
+        const m = new Map();
+        for (const [k,v] of g.entries()) m.set(k, v);
+        return m;
+      }
+      function clonePieceObj(p) {
+        if (!p) return null;
+        return {
+          type: p.type,
+          pos: { q: p.pos.q, r: p.pos.r },
+          cells: p.cells.map(c => ({ q: c.q, r: c.r })),
+          color: p.color,
+          name: p.name
+        };
+      }
+      function cloneQueue(qarr) {
+        return qarr.map(clonePieceObj);
+      }
+
+      function pushSnapshot() {
+        snapshots.push({
+          grid: cloneGrid(grid),
+          piece: clonePieceObj(piece),
+          queue: cloneQueue(queue),
+          bag: [...bag],
+          holdPiece: clonePieceObj(holdPiece),
+          canHold,
+          linesCleared,
+          lockDelayEnd,
+          piecesPlaced,
+          b2b,
+          combo,
+          totalAttack,
+        });
+      }
+      function restoreSnapshot(snapshot) {
+        if (!snapshot) return;
+        grid = cloneGrid(snapshot.grid);
+        piece = clonePieceObj(snapshot.piece);
+        queue = cloneQueue(snapshot.queue);
+        bag = [...snapshot.bag];
+        holdPiece = clonePieceObj(snapshot.holdPiece);
+        canHold = snapshot.canHold;
+        gameOver = false;
+        gameEndTime = 0;
+        linesCleared = snapshot.linesCleared;
+        lockDelayEnd = snapshot.lockDelayEnd;
+        piecesPlaced = snapshot.piecesPlaced;
+        b2b = snapshot.b2b;
+        combo = snapshot.combo;
+        totalAttack = snapshot.totalAttack;
+        messageLines = [];
+        messageTimer = 0;
+        gravityTimer = 0;
+        finesseMoves = 0;
+        lastMoveTime = Date.now();
+      }
+      function undoLastPlacement() {
+        if (snapshots.length <= 1) {
+          if (snapshots.length === 1) restoreSnapshot(snapshots[0]);
+          return;
+        }
+        snapshots.pop();
+        const previous = snapshots[snapshots.length - 1];
+        restoreSnapshot(previous);
+      }
+
+      const key = (q, r) => q + "," + r,
+            occupied = (q, r) => grid.has(key(q, r));
+      const addToGrid = (cells, color) => {
+        for (const c of cells) grid.set(key(c.q, c.r), color);
+      };
+      const drawGrid = () => {
+        for (const [k, color] of grid) {
+          const [q, r] = k.split(",").map(Number);
+          drawHex(q, r, color);
+        }
+      };
+
+      function refillBag() {
+        bag = [...Array(TETRAHEXES.length).keys()];
+        for (let i = bag.length - 1; i > 0; i--) {
+          const t = Math.floor(Math.random() * (i + 1));
+          [bag[i], bag[t]] = [bag[t], bag[i]];
+        }
+      }
+      const nextPieceIndex = () => {
+        if (!bag.length) refillBag();
+        return bag.pop();
+      };
+      function makePiece(idx) {
+        return {
+          type: idx,
+          pos: { q: 0, r: 2 },
+          cells: TETRAHEXES[idx].map((c) => ({ ...c })),
+          color: TETRAHEX_COLORS[idx],
+          name: TETRAHEX_NAMES[idx],
+        };
+      }
+      function fillQueue() {
+        while (queue.length < 5) queue.push(makePiece(nextPieceIndex()));
+      }
+      function spawnPiece() {
+        piece = queue.shift();
+        fillQueue();
+        if (collides(piece)) {
+          gameOver = true;
+          gameEndTime = Date.now();
+        }
+      }
+
+      const collides = (p) =>
+        worldCells(p).some((c) => !inBounds(c.q, c.r) || occupied(c.q, c.r));
+      const keys = {},
+            normalizeKey = (e) => (e.key === " " ? "space" : e.key.toLowerCase());
+      document.addEventListener("keydown", (e) => {
+        const k = normalizeKey(e);
+        keys[k] = true;
+        if (["arrowleft", "arrowright", "arrowdown",
+             "space", "backspace", "c"].includes(k)) e.preventDefault();
+        if (Date.now() - lastMoveTime > keyRepeatDelay) {
+          if (k === "backspace") {
+            e.preventDefault();
+            undoLastPlacement();
+            return;
+          }
+          if (k === "c") holdCurrentPiece();
+          if (k === "r") resetGame();
+        }
+      });
+      document.addEventListener("keyup", (e) => (keys[normalizeKey(e)] = false));
+
+      function clearLines() {
+        const occupiedCells = [...grid.keys()].map(k => {
+          const [q, r] = k.split(",").map(Number);
+          return { q, r, val: q + 2 * r };
+        });
+        if (occupiedCells.length === 0) return 0;
+        const linesToClear = [];
+        for (let n = 1; n <= 15; n++) {
+          const range = [2 * n - 1, 2 * n];
+          const lineCells = occupiedCells.filter(c => range.includes(c.val));
+          const allPositions = [];
+          for (let q = -5; q <= 5; q++) {
+            for (let r = -10; r <= 40; r++) {
+              if (!inBounds(q, r)) continue;
+              const val = q + 2 * r;
+              if (range.includes(val)) allPositions.push({ q, r });
+            }
+          }
+          if (lineCells.length === allPositions.length && allPositions.length > 0)
+            linesToClear.push({ n, cells: lineCells });
+        }
+        if (linesToClear.length === 0) return 0;
+        linesCleared += linesToClear.length;
+        for (const { cells } of linesToClear)
+          for (const { q, r } of cells)
+            grid.delete(key(q, r));
+        const clearThresholds = linesToClear.map(({ n }) => 2 * n - 1);
+        clearThresholds.sort((a, b) => a - b);
+        for (const thresh of clearThresholds) {
+          const newGrid = new Map();
+          for (const [k, color] of grid.entries()) {
+            let [q, r] = k.split(",").map(Number);
+            const val = q + 2 * r;
+            if (val <= thresh) r += 1;
+            newGrid.set(key(q, r), color);
+          }
+          grid = newGrid;
+        }
+        return linesToClear.length;
+      }
+      function isSpin(p) {
+        return HEX_DIRS.every(d => collides({
+          ...p,
+          pos: { q: p.pos.q + d.q, r: p.pos.r + d.r }
+        }));
+      }
+      // note: locking costs a turn
+      function computeFinesse() {
+        const reach = new Map(),
+              queue = [];
+        const startingPiece = makePiece(piece.type);
+        const sortCells = (p) =>
+          worldCells(p).map(c => `${c.q},${c.r}`).sort().join("|");
+        const id = (p) => sortCells(p)+`|${p.pos.q},${p.pos.r}`;
+        const target = sortCells(piece);
+        reach.set(id(startingPiece), 0);
+        queue.push([0, startingPiece]);
+        while (queue.length) {
+          queue.sort();
+          const [d, P] = queue.shift();
+          if (sortCells(P) === target) return reach.get(id(P)) + 1;
+          let [goodL, pieceL] = movePiece(P, DIR.LEFT.q, DIR.LEFT.r);
+          let [goodR, pieceR] = movePiece(P, DIR.RIGHT.q, DIR.RIGHT.r);
+          let [goodD, pieceD] = movePiece(P, DIR.DOWN.q, DIR.DOWN.r);
+          let pieceH = getDroppedPiece(P);
+          if (goodL && !reach.has(id(pieceL))) {
+            reach.set(id(pieceL), d + 1);
+            queue.push([d + 1, pieceL]);
+          }
+          if (goodR && !reach.has(id(pieceR))) {
+            reach.set(id(pieceR), d + 1);
+            queue.push([d + 1, pieceR]);
+          }
+          if (goodD && !reach.has(id(pieceD))) {
+            reach.set(id(pieceD), d + 1);
+            queue.push([d + 1, pieceD]);
+          }
+          if(sortCells(pieceH) === target) return d + 1; // hard drop
+          if (!reach.has(id(pieceH))) {
+            reach.set(id(pieceH), d + 1);
+            queue.push([d + 1, pieceH]);
+          }
+          for (let i = 1; i <= 5; i += 1) {
+            let [good, pieceN] = tryRotatePiece(P, i);
+            if (good && !reach.has(id(pieceN))) {
+              reach.set(id(pieceN), d + 1);
+              queue.push([d + 1, pieceN]);
+            }
+          }
+        }
+        console.log('Finesse search bug');
+        return -1;
+      }
+      function lockPieceAndSpawn() {
+        const finesseMin = computeFinesse();
+        messageLines = [];
+        messageTimer = Date.now() + messageLifetime;
+        enableFinesse = gravitySpeed === 0;
+        if (enableFinesse && finesseMoves > finesseMin)
+          messageLines.push(`F+${finesseMoves - finesseMin}`);
+        else messageLines.push(``);
+        finesseMoves = 0;
+        const wasSpin = isSpin(piece);
+        addToGrid(worldCells(piece), piece.color);
+        const count = clearLines();
+        piecesPlaced++;
+        if (count > 0) {
+          combo++;
+          if (wasSpin || count === 4) b2b += 1;
+          else b2b = -1;
+          if (b2b >= 1) messageLines.push(`B2B x${b2b}`);
+          else messageLines.push('');
+          if (wasSpin) messageLines.push(`${piece.name}-Spin`);
+          else messageLines.push('');
+          messageLines.push(["Single", "Double", "Triple", "Quad"][count - 1]);
+          if (combo > 0) messageLines.push(`${combo} Combo`);
+          else messageLines.push('');
+          let attack = 0;
+          if (wasSpin) attack = [0, 2, 4, 6, 8][count];
+          else attack = [0, 0, 1, 2, 4][count];
+          if (b2b >= 1) attack += 1;
+          totalAttack += attack;
+        } else combo = -1;
+
+        spawnPiece();
+        canHold = true;
+        pushSnapshot();
+      }
+
+      function update(dt) {
+        if (countdown > 0) {
+          gameStartTime = Date.now();
+          const elapsed = (Date.now() - countdownStart) / 500;
+          countdown = Math.max(0, 3 - Math.floor(elapsed));
+          if (!piece && countdown === 0) spawnPiece();
+          return;
+        }
+        const t = Date.now();
+        if (t - lastMoveTime > keyRepeatDelay) {
+          if (keys.arrowleft) {
+            let [good, p] = movePiece(piece, DIR.LEFT.q, DIR.LEFT.r);
+            if (good) {
+              piece = p;
+              lastMoveTime = t;
+              gravityTimer = 0;
+              finesseMoves += 1;
+            }
+          }
+          if (keys.arrowright) {
+            let [good, p] = movePiece(piece, DIR.RIGHT.q, DIR.RIGHT.r);
+            if (good) {
+              piece = p;
+              lastMoveTime = t;
+              gravityTimer = 0;
+              finesseMoves += 1;
+            }
+          }
+          if (keys.arrowup) {
+            let [good, p] = movePiece(piece, DIR.DOWN.q, DIR.DOWN.r);
+            if (good) {
+              piece = p;
+              lastMoveTime = t;
+              gravityTimer = 0;
+              finesseMoves += 1;
+            }
+          }
+          if (keys.arrowdown && t > lockDelayEnd) {
+            const drop = getDroppedPiece(piece);
+            if (drop.pos.q !== piece.pos.q || drop.pos.r !== piece.pos.r) {
+              piece = drop;
+              lastMoveTime = t;
+              gravityTimer = 0;
+              finesseMoves += 1;
+            }
+          }
+          for (const { key, steps } of ROTATION_KEYS) {
+            if (keys[key]) {
+              let [good, p] = tryRotatePiece(piece, steps);
+              if (good) {
+                piece = p;
+                lastMoveTime = t;
+                gravityTimer = 0;
+                finesseMoves += 1;
+              }
+            }
+          }
+          if (keys.space && t > lockDelayEnd) {
+            piece = getDroppedPiece(piece);
+            lastMoveTime = t;
+            gravityTimer = 0;
+            finesseMoves += 1;
+            lockPieceAndSpawn();
+          }
+        }
+        if (piece && gravitySpeed > 0) {
+          gravityTimer += dt;
+          const msPerCell = 1000 / gravitySpeed;
+          while (gravityTimer >= msPerCell) {
+            gravityTimer -= msPerCell;
+            let [good, p] = movePiece(piece, DIR.DOWN.q, DIR.DOWN.r);
+            piece = p;
+            finesseMoves += 1;
+            if (!good) {
+              lockPieceAndSpawn();
+              lockDelayEnd = t + accidentalHardDropTime;
+              break;
+            }
+          }
+        }
+      }
+
+      function hexToRgba(hex, alpha = 1) {
+        if (!hex) return `rgba(0,0,0,${alpha})`;
+        const h = hex.replace("#", "");
+        const r = parseInt(h.substring(0, 2), 16);
+        const g = parseInt(h.substring(2, 4), 16);
+        const b = parseInt(h.substring(4, 6), 16);
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+      function drawQueue() {
+        const baseX = canvas.width - 100, baseY = 120;
+        for (let i = 0; i < queue.length; i++) {
+          const p = queue[i],
+                offsetY = baseY + i * 110;
+          for (const c of p.cells) {
+            const x = baseX + size * 0.8 * (1.5 * c.q),
+                  y = offsetY + size * 0.8 * Math.sqrt(3) * (c.r + c.q / 2);
+            ctx.beginPath();
+            for (let j = 0; j < 6; j++) {
+              const a = (Math.PI / 180) * (60 * j),
+                    px = x + size * 0.8 * Math.cos(a),
+                    py = y + size * 0.8 * Math.sin(a);
+              j ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = p.color;
+            ctx.fill();
+            ctx.strokeStyle = "#333";
+            ctx.stroke();
+          }
+        }
+      }
+      function drawHold() {
+        const baseX = 100, baseY = 120;
+        if (!holdPiece) return;
+        for (const c of holdPiece.cells) {
+          const x = baseX + size * 0.8 * (1.5 * c.q);
+          const y = baseY + size * 0.8 * Math.sqrt(3) * (c.r + c.q / 2);
+          ctx.beginPath();
+          for (let j = 0; j < 6; j++) {
+            const a = (Math.PI / 180) * (60 * j),
+                  px = x + size * 0.8 * Math.cos(a),
+                  py = y + size * 0.8 * Math.sin(a);
+            j ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fillStyle = holdPiece.color;
+          ctx.fill();
+          ctx.strokeStyle = "#333";
+          ctx.stroke();
+        }
+      }
+
+      function drawStats() {
+        const elapsed = (gameEndTime ? gameEndTime : Date.now()) - gameStartTime;
+        const minutes = Math.floor(elapsed / 60000);
+        const seconds = Math.floor(elapsed / 1000) % 60;
+        const milliseconds = Math.floor(elapsed / 10) % 100;
+        ctx.fillStyle = "#fff";
+        ctx.font = "20px monospace";
+        ctx.textAlign = "left";
+        let statsX = 35, statsY = canvas.height - 220;
+        ctx.fillText(`${minutes}:${seconds.toString().padStart(2,'0')}:${milliseconds.toString().padStart(2,'0')}`, statsX, statsY);
+        statsY += 25;
+        ctx.fillText(`L: ${linesCleared}`, statsX, statsY);
+        statsY += 25;
+        const lpm = (linesCleared * 60000 / (elapsed + 1)).toFixed(2);
+        ctx.fillText(`LPM: ${lpm}`, statsX, statsY);
+        statsY += 25;
+        ctx.fillText(`P: ${piecesPlaced}`, statsX, statsY);
+        statsY += 25;
+        const pps = (piecesPlaced * 1000 / (elapsed + 1)).toFixed(2);
+        ctx.fillText(`PPS: ${pps}`, statsX, statsY);
+        statsY += 25;
+        ctx.fillText(`A: ${totalAttack}`, statsX, statsY);
+        statsY += 25;
+        const apm = (totalAttack * 60000 / (elapsed + 1)).toFixed(2);
+        ctx.fillText(`APM: ${apm}`, statsX, statsY);
+        statsY += 25;
+      }
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackgroundGrid();
+        drawGrid();
+        drawHold();
+        drawQueue();
+        if (piece) {
+          const shadow = getDroppedPiece(piece);
+          if (shadow)
+            for (const c of worldCells(shadow))
+              drawHex(c.q, c.r, "rgba(200,200,200,0.2)");
+          const [cx, cy] = axialToPixel(piece.pos.q, piece.pos.r);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+          ctx.fillStyle = "red";
+          ctx.fill();
+          const translucent = hexToRgba(piece.color, 0.6);
+          for (const c of worldCells(piece)) drawHex(c.q, c.r, translucent);
+        }
+        if (gameOver) {
+          ctx.fillStyle = "rgba(0,0,0,0.6)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#ff6666";
+          ctx.font = "48px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+          ctx.fillStyle = "#fff";
+          ctx.font = "18px monospace";
+          ctx.fillText("Game over, R to restart", canvas.width / 2, canvas.height / 2 + 30);
+        } else if (countdown > 0) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "72px monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(countdown, canvas.width / 2, canvas.height / 2);
+        }
+        if (messageLines && Date.now() < messageTimer) {
+          let statsY = 200;
+          ctx.fillStyle = "#fff";
+          ctx.font = "24px monospace";
+          ctx.textAlign = "left";
+          for (const line of messageLines)
+            ctx.fillText(line, 35, statsY), (statsY += 25);
+        }
+        drawStats();
+      }
+
+      function gameLoop(ts) {
+        if (!lastTime) lastTime = ts;
+        const dt = ts - lastTime;
+        lastTime = ts;
+        if (!gameOver) update(dt);
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+      resetGame();
+      requestAnimationFrame(gameLoop);
+    </script>
+  </body>
+</html>
