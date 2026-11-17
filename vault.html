@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none';script-src 'unsafe-inline';style-src 'unsafe-inline';img-src data:;connect-src 'none';form-action 'none';base-uri 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Vault</title>
+<style>
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html,body{margin:0;height:100%;background:#000;color:#e6edf3;font:15px/1.4 -apple-system,system-ui,sans-serif;overflow:hidden;-webkit-text-size-adjust:100%}
+body{display:flex;flex-direction:column;height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+h3{margin:4px 0 10px}.mu{color:#8b949e}.wr{color:#d29922}
+#tabs{display:flex;border-bottom:1px solid #30363d}
+.tab{flex:1;padding:12px 4px;text-align:center;color:#8b949e;border-bottom:2px solid transparent}
+.tab.on{color:#fff;border-color:#f78166}
+#main{flex:1;min-height:0;position:relative}
+.pg{position:absolute;inset:0;overflow:auto;padding:12px;display:none;-webkit-overflow-scrolling:touch}
+.pg.on{display:block}#pe.on{display:flex;flex-direction:column;padding:0}
+.b{display:inline-block;padding:9px 14px;border:1px solid #30363d;border-radius:8px;margin:4px 4px 4px 0;background:#000;color:#e6edf3}
+.b:active,.row:active{background:#1c1f24}.b.p{border-color:#238636;color:#3fb950}.b.d{border-color:#6e2a2a;color:#f85149}
+.b.on{background:#1f6feb;border-color:#1f6feb}.b.w{display:block;width:100%;text-align:center;margin:8px 0}
+.card2{border:1px solid #30363d;border-radius:8px;padding:12px;margin-bottom:12px}
+.bar{height:6px;border:1px solid #30363d;border-radius:4px;margin:8px 0}.bar i{display:block;height:100%;background:#238636}
+.crumb{padding:6px 0 8px;font-size:16px}.crumb a{color:#2f81f7}
+.row{display:flex;align-items:center;gap:10px;padding:12px 8px;border-top:1px solid #21262d}
+.row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dots{padding:0 10px;font-size:20px}
+.list{border:1px solid #30363d;border-radius:8px;margin-top:8px}.list .row:first-child{border-top:0}
+#eh{padding:8px 12px;border-bottom:1px solid #30363d;font-family:ui-monospace,Menlo,monospace}
+#tb{padding:4px 8px;border-bottom:1px solid #30363d}#tb .b{padding:6px 10px;margin:2px 2px}
+#q{padding:6px 8px;border-bottom:1px solid #30363d;overflow-x:auto;white-space:nowrap;font-size:13px}
+.chip{display:inline-block;border:1px solid #30363d;border-radius:12px;padding:3px 4px 3px 10px;margin-right:6px;font-family:ui-monospace,Menlo,monospace}
+.chip.on{border-color:#2f81f7}.chip b{padding:0 8px;color:#8b949e}
+#pe.noe #tb,#pe.noe #q{display:none}
+#edw{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
+#ed{margin:0;padding:10px 10px 40px;min-height:100%;white-space:pre-wrap;word-break:break-word;font:14px/1.5 ui-monospace,Menlo,monospace;tab-size:4}
+#ed,#ed *{-webkit-user-select:text;user-select:text}
+.c{color:#8b949e}.s{color:#a5d6ff}.n{color:#79c0ff}.k{color:#ff7b72}.t{color:#7ee787}.sl{background:#1f6feb88}
+.cur{display:inline-block;width:0;height:1.2em;border-left:2px solid #2f81f7;margin-left:-1px;vertical-align:text-bottom;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+#ov{display:none;position:absolute;inset:0;background:#000;z-index:5;padding:14px;overflow:auto}
+.card{border:1px solid #30363d;border-radius:10px;padding:14px}.ttl{font-weight:600;margin-bottom:10px;word-break:break-all}
+.fld{min-height:46px;border:1px solid #2f81f7;border-radius:8px;padding:10px;font:16px ui-monospace,Menlo,monospace;word-break:break-all;margin-bottom:8px}
+.fld:after{content:"";display:inline-block;height:1.1em;border-left:2px solid #2f81f7;vertical-align:text-bottom;animation:bl 1s steps(1) infinite}
+#toast{display:none;position:absolute;left:12px;right:12px;bottom:12px;z-index:9;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center}
+#busy{display:none;position:fixed;inset:0;background:#000;z-index:20;align-items:center;justify-content:center;color:#8b949e}
+#kb{display:none;border-top:1px solid #30363d;padding:6px 3px 2px}#kb.on{display:block}
+.kr{display:flex;gap:5px;margin-bottom:6px}
+.k{flex:1;height:42px;display:flex;align-items:center;justify-content:center;border:1px solid #3a3f47;border-radius:6px;font-size:18px;background:#000}
+.k:active,.k.on{background:#2a2f36}.k.f{font-size:14px}
+.fi{position:fixed;left:-99px;top:0;width:1px;height:1px;opacity:0}
+p{margin:10px 0}
+</style></head><body>
+<div id="tabs"><div class="tab on" data-t="v">🔐 Vault</div><div class="tab" data-t="f">📁 Files</div><div class="tab" data-t="e">✎ Editor</div></div>
+<div id="main">
+<div class="pg on" id="pv"></div><div class="pg" id="pf"></div>
+<div class="pg noe" id="pe"><div id="eh"></div>
+<div id="tb"><span class="b p" data-a="save">Save</span><span class="b" data-a="kb">⌨</span><span class="b" data-a="undo">Undo</span><span class="b" id="bsel" data-a="sel">Sel</span><span class="b" data-a="l">←</span><span class="b" data-a="r">→</span><span class="b" data-a="u">↑</span><span class="b" data-a="d">↓</span><span class="b" data-a="h">Home</span><span class="b" data-a="e">End</span><span class="b" data-a="t">Top</span><span class="b" data-a="b">Bottom</span><span class="b" data-a="all">All</span><span class="b" data-a="copy">Copy</span><span class="b" data-a="cut">Cut</span><span class="b" data-a="paste">Paste</span><span class="b d" data-a="close">Close</span></div>
+<div id="q"></div><div id="edw"><pre id="ed"></pre></div></div>
+<div id="ov"></div><div id="toast"></div></div>
+<div id="kb"></div><div id="busy"></div>
+<input type="file" class="fi" id="fv"><input type="file" class="fi" id="fu" multiple>
+<script>
+'use strict';
+const $=s=>document.querySelector(s),enc=new TextEncoder(),dec=new TextDecoder('utf-8',{fatal:true});
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MAXV=100*1024*1024,MAXN=20000,MAXED=102400,ITER=2000000,HL=53,MAGIC=enc.encode('HVLT1');
+let V=null,E=null,tab='v',cwd='',P=null,shift=false,layer='a',qi=0;const Q=[];
+const fmt=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB';
+const okName=n=>n!=='.'&&n!=='..'&&/^[^\/\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]{1,255}$/.test(n);
+const okPath=p=>{const s=p.split('/');return s.length<=32&&enc.encode(p).length<=1024&&s.every(okName)};
+const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',2800)}
+async function busy(m){const b=$('#busy');b.style.display=m?'flex':'none';if(m){b.textContent=m;await new Promise(r=>setTimeout(r,60))}}
+
+/* ---------- crypto + serialization (no compression => no zip bombs) ---------- */
+async function derive(pw,salt,it){
+  const k=await crypto.subtle.importKey('raw',enc.encode(pw.normalize('NFKC')),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-512',salt,iterations:it},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+const used=()=>{let n=4;for(const[p,b]of V.files)n+=6+enc.encode(p).length+b.length;for(const d of V.dirs)n+=7+enc.encode(d).length;return n};
+function ser(){
+  const e=[...V.files];for(const d of V.dirs)e.push([d+'/',new Uint8Array(0)]);
+  const ps=e.map(x=>enc.encode(x[0]));let n=4;e.forEach((x,i)=>n+=6+ps[i].length+x[1].length);
+  if(n>MAXV||e.length>MAXN)throw Error('Vault exceeds 100 MB / 20,000 entries');
+  const o=new Uint8Array(n),dv=new DataView(o.buffer);dv.setUint32(0,e.length);let p=4;
+  e.forEach((x,i)=>{dv.setUint16(p,ps[i].length);p+=2;o.set(ps[i],p);p+=ps[i].length;dv.setUint32(p,x[1].length);p+=4});
+  e.forEach(x=>{o.set(x[1],p);p+=x[1].length});return o;
+}
+function des(b){
+  const bad=()=>{throw Error('Corrupt vault structure')},dv=new DataView(b.buffer,b.byteOffset,b.byteLength);
+  if(b.length<4)bad();const n=dv.getUint32(0);if(n>MAXN)bad();
+  let o=4,tot=0;const e=[];
+  for(let i=0;i<n;i++){
+    if(o+2>b.length)bad();const pl=dv.getUint16(o);o+=2;if(!pl||pl>1024||o+pl+4>b.length)bad();
+    let p;try{p=dec.decode(b.subarray(o,o+pl))}catch{bad()}o+=pl;
+    const sz=dv.getUint32(o);o+=4;tot+=sz;if(tot>MAXV)bad();e.push([p,sz]);
+  }
+  if(o+tot!==b.length)bad();               // sizes must account for every byte exactly
+  const files=new Map(),dirs=new Set(),seen=new Set();
+  for(const[p,sz]of e){
+    const d=p.endsWith('/'),q=d?p.slice(0,-1):p;
+    if(!okPath(q)||(d&&sz)||seen.has(q))bad();seen.add(q);
+    if(d)dirs.add(q);else files.set(q,b.slice(o,o+sz));o+=sz;
+  }
+  for(const q of[...files.keys(),...dirs]){const s=q.split('/');for(let i=1;i<s.length;i++)dirs.add(s.slice(0,i).join('/'))}
+  for(const d of dirs)if(files.has(d))bad();
+  return{files,dirs};
+}
+async function unseal(buf,pw){
+  const nv=()=>Error('Not a valid vault file');
+  if(buf.length<HL+16||buf.length>HL+16+MAXV)throw nv();
+  for(let i=0;i<5;i++)if(buf[i]!==MAGIC[i])throw nv();
+  const it=new DataView(buf.buffer,buf.byteOffset).getUint32(5);if(it<200000||it>10000000)throw Error('Unsupported KDF parameters');
+  const key=await derive(pw,buf.slice(9,41),it);let pt;
+  try{pt=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(41,53),additionalData:buf.slice(0,41)},key,buf.subarray(HL)))}
+  catch{throw Error('Wrong password or damaged file')}
+  try{return{...des(pt),it}}finally{pt.fill(0)}
+}
+async function seal(){
+  V.it=Math.max(V.it,ITER);const h=new Uint8Array(HL),iv=rnd(12);
+  h.set(MAGIC);new DataView(h.buffer).setUint32(5,V.it);h.set(rnd(32),9);h.set(iv,41);
+  const key=await derive(V.pw,h.slice(9,41),V.it),pt=ser();let ct;
+  try{ct=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:h.slice(0,41)},key,pt)}finally{pt.fill(0)}
+  return new Blob([h,ct],{type:'application/octet-stream'});
+}
+function dl(b,n){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),6e4)}
+
+/* ---------- on-screen keyboard ---------- */
+const LY={a:['q w e r t y u i o p','a s d f g h j k l','⇧ z x c v b n m ⌫','123 ⇥ , ␣ . ⏎'],
+ n:['1 2 3 4 5 6 7 8 9 0','- / : ; ( ) $ & @ "',"#+= . , ? ! ' ⌫",'ABC ⇥ ␣ ⏎'],
+ s:['[ ] { } # % ^ * + =','_ \\ | ~ < > € £ ¥ `',"123 . , ? ! ' ⌫",'ABC ⇥ ␣ ⏎']};
+const W={'⇧':1.5,'⌫':1.5,'123':1.5,'ABC':1.5,'#+=':1.5,'⇥':1.2,'␣':4,'⏎':1.8};
+function drawKb(){
+  $('#kb').innerHTML=LY[layer==='A'?'a':layer].map(r=>'<div class="kr">'+r.split(' ').map(k=>{
+    const l=layer==='A'&&/^[a-z]$/.test(k)?k.toUpperCase():k;
+    return `<div class="k${W[k]&&k!=='⌫'?' f':''}${k==='⇧'&&shift?' on':''}" style="flex:${W[k]||1}" data-k="${esc(l)}">${k==='␣'?'space':k==='⏎'?'return':esc(l)}</div>`}).join('')+'</div>').join('');
+}
+const PT={ins(s){if(s!=='\t'&&[...P.val].length<256){P.val+=s;drawP()}},bs(){P.val=[...P.val].slice(0,-1).join('');drawP()},enter(){endP(P.val)}};
+const ET={ins(s){const r=sel()||[E.cur,E.cur];rep(r[0],r[1],s)},
+ enter(){const r=sel()||[E.cur,E.cur],ls=r[0]?E.text.lastIndexOf('\n',r[0]-1)+1:0;ET.ins('\n'+/^[ \t]*/.exec(E.text.slice(ls,r[0]))[0])},
+ bs(){const r=sel();if(r)return rep(r[0],r[1],'');if(E.cur>0){const c=E.text.charCodeAt(E.cur-1);rep(E.cur-(c>=0xDC00&&c<0xE000&&E.cur>1?2:1),E.cur,'')}}};
+const T=()=>P?PT:E?ET:null;
+function press(k){
+  const t=T();if(!t)return;
+  if(k==='⇧'){shift=!shift;layer=shift?'A':'a';return drawKb()}
+  if(k==='123'){layer='n';return drawKb()}if(k==='#+='){layer='s';return drawKb()}if(k==='ABC'){layer=shift?'A':'a';return drawKb()}
+  if(k==='⌫')t.bs();else if(k==='⏎')t.enter();
+  else{t.ins(k==='␣'?' ':k==='⇥'?'\t':k);if(shift){shift=false;layer='a';drawKb()}}
+}
+function updKb(){const on=(P&&!P.yn&&!P.items)||(!P&&tab==='e'&&E&&E.kb);$('#kb').classList.toggle('on',!!on);if(on)drawKb()}
+let rep_;
+$('#kb').addEventListener('pointerdown',e=>{
+  const el=e.target.closest('[data-k]');if(!el)return;e.preventDefault();const k=el.dataset.k;press(k);
+  if(k==='⌫'){clearTimeout(rep_);rep_=setTimeout(function f(){press('⌫');rep_=setTimeout(f,55)},380)}
+});
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>clearTimeout(rep_)));
+
+/* ---------- prompt / menu ---------- */
+function ask(title,o={}){return new Promise(res=>{P={title,val:o.value||'',sec:!!o.secret,show:false,yn:!!o.yn,items:o.items,res};drawP();updKb()})}
+function endP(v){const r=P.res;P=null;$('#ov').style.display='none';updKb();r(v)}
+function drawP(){
+  let h=`<div class="card"><div class="ttl">${esc(P.title)}</div>`;
+  if(P.items)h+=P.items.map((t,i)=>`<div class="b w${/Delete/.test(t)?' d':''}" data-m="${i}">${esc(t)}</div>`).join('')+'<div class="b w" data-m="x">Cancel</div>';
+  else if(P.yn)h+='<div class="b w d" data-m="y">Confirm</div><div class="b w" data-m="x">Cancel</div>';
+  else{h+=`<div class="fld">${esc(P.sec&&!P.show?'•'.repeat([...P.val].length):P.val)}</div>`;
+    if(P.sec)h+=`<div class="b" data-m="s">${P.show?'Hide':'Show'}</div>`;h+='<div class="b p" data-m="y">OK</div><div class="b" data-m="x">Cancel</div>'}
+  const o=$('#ov');o.style.display='block';o.innerHTML=h+'</div>';
+}
+$('#ov').addEventListener('click',e=>{
+  const m=e.target.closest('[data-m]');if(!m||!P)return;const v=m.dataset.m;
+  if(v==='s'){P.show=!P.show;return drawP()}
+  if(v==='x')return endP(null);
+  endP(P.items?+v:P.yn?true:P.val);
+});
+
+/* ---------- editor ---------- */
+const LG={js:'c',mjs:'c',ts:'c',jsx:'c',tsx:'c',c:'c',h:'c',cpp:'c',cs:'c',java:'c',go:'c',rs:'c',swift:'c',kt:'c',php:'c',css:'c',json:'c',py:'p',sh:'p',rb:'p',yml:'p',yaml:'p',toml:'p',conf:'p',ini:'p',md:'m',html:'h',htm:'h',xml:'h',svg:'h'};
+const NO='((?!))',STR='"(?:\\\\.|[^"\\\\\\n])*"?|\'(?:\\\\.|[^\'\\\\\\n])*\'?';
+const R={c:new RegExp('(//[^\\n]*|/\\*[\\s\\S]*?(?:\\*/|$))|('+STR+'|`(?:\\\\[\\s\\S]|[^`\\\\])*`?)|(\\b\\d[\\w.]*)|(\\b[A-Za-z_$][\\w$]*)|'+NO,'g'),
+ p:new RegExp('(#[^\\n]*)|('+STR+')|(\\b\\d[\\w.]*)|(\\b[A-Za-z_]\\w*)|'+NO,'g'),
+ h:new RegExp('(<!--[\\s\\S]*?(?:-->|$))|("[^"\\n]*"?|\'[^\'\\n]*\'?)|'+NO+'|'+NO+'|(</?[A-Za-z][\\w:-]*|/?>)','g'),
+ m:new RegExp('((?!))|(`[^`\\n]*`?)|((?!))|((?!))|(^#{1,6} .*$|\\*\\*[^*\\n]+\\*\\*|^[-*>] )','gm')};
+const KW=new Set('if else for while do return function const let var class import export from new this try catch finally throw switch case break continue default async await yield typeof instanceof in of def elif lambda pass with as is not and or None True False true false null undefined void static public private protected interface enum struct fn pub use mod impl match mut package extends implements super self int float double char bool string fi then done echo'.split(' '));
+const lang=()=>{const m=/\.([^.\/]+)$/.exec(E.path);return m&&LG[m[1].toLowerCase()]};
+function hl(t,lg){
+  const re=R[lg];if(!re)return t.length?[[0,t.length,'']]:[];
+  re.lastIndex=0;const o=[];let p=0,m;
+  while((m=re.exec(t))){
+    const c=m[1]?'c':m[2]?'s':m[3]?'n':m[4]?(KW.has(m[4])?'k':''):m[5]?'t':'';
+    if(c){if(m.index>p)o.push([p,m.index,'']);p=m.index+m[0].length;o.push([m.index,p,c])}
+  }
+  if(p<t.length)o.push([p,t.length,'']);return o;
+}
+const sel=()=>E.anc==null||E.anc===E.cur?null:[Math.min(E.anc,E.cur),Math.max(E.anc,E.cur)];
+function rep(a,b,s){
+  const t=E.text.slice(0,a)+s+E.text.slice(b);if(enc.encode(t).length>MAXED)return toast('100 KB editor limit reached');
+  E.undo.push([E.text,E.cur]);if(E.undo.length>50)E.undo.shift();
+  E.text=t;E.cur=a+s.length;E.anc=null;E.dirty=true;draw();
+}
+function mv(k){
+  const t=E.text,s=sel();let c=E.cur;
+  if(!E.ext&&s&&(k==='l'||k==='r')){E.cur=k==='l'?s[0]:s[1];E.anc=null;return draw()}
+  if(E.ext){if(E.anc==null)E.anc=c}else E.anc=null;
+  const ls=c?t.lastIndexOf('\n',c-1)+1:0,lo=x=>(x>=0xDC00&&x<0xE000),hi=x=>(x>=0xD800&&x<0xDC00);
+  if(k==='l')c=Math.max(0,c-(c>1&&lo(t.charCodeAt(c-1))?2:1));
+  else if(k==='r')c=Math.min(t.length,c+(hi(t.charCodeAt(c))?2:1));
+  else if(k==='h')c=ls;
+  else if(k==='e'){const n=t.indexOf('\n',c);c=n<0?t.length:n}
+  else if(k==='t')c=0;else if(k==='b')c=t.length;
+  else if(k==='u'){if(ls===0)c=0;else{const ps=ls>=2?t.lastIndexOf('\n',ls-2)+1:0;c=Math.min(ps+(c-ls),ls-1)}}
+  else if(k==='d'){const ne=t.indexOf('\n',c);if(ne<0)c=t.length;else{const nn=t.indexOf('\n',ne+1);c=Math.min(ne+1+(c-ls),nn<0?t.length:nn)}}
+  E.cur=c;draw();
+}
+async function openEd(path){
+  if(E&&E.dirty&&E.path!==path&&!await ask('Discard unsaved edits to '+E.path+'?',{yn:1}))return;
+  const b=V.files.get(path);if(b.length>MAXED)return toast('Only UTF-8 text files up to 100 KB can be edited');
+  let t;try{t=dec.decode(b)}catch{return toast('Not valid UTF-8 text')}
+  if(t.includes('\0'))return toast('Binary file');
+  E={path,text:t.replace(/\r\n/g,'\n'),cur:0,anc:null,ext:false,undo:[],dirty:false,kb:true};setTab('e');
+}
+function saveEd(){
+  const old=V.files.get(E.path);V.files.set(E.path,enc.encode(E.text));
+  if(used()>MAXV){V.files.set(E.path,old);return toast('Vault is full')}
+  V.dirty=true;E.dirty=false;toast('Saved to vault (remember to save the vault file)');draw();
+}
+function cc(cut){
+  const r=sel();if(!r)return toast('Turn on Sel, then move to select text');
+  Q.unshift(E.text.slice(r[0],r[1]));if(Q.length>30)Q.pop();qi=0;
+  if(cut)rep(r[0],r[1],'');else{E.anc=null;draw()}
+}
+function at(x,y){
+  let n,o;
+  if(document.caretPositionFromPoint){const p=document.caretPositionFromPoint(x,y);if(p){n=p.offsetNode;o=p.offset}}
+  else if(document.caretRangeFromPoint){const r=document.caretRangeFromPoint(x,y);if(r){n=r.startContainer;o=r.startOffset}}
+  if(!n)return null;const el=(n.nodeType===3?n.parentNode:n).closest('[data-o]');
+  return el?+el.dataset.o+(n.nodeType===3?o:0):null;
+}
+function draw(){
+  const pe=$('#pe');pe.classList.toggle('noe',!E);
+  if(!E){$('#eh').innerHTML='<span class="mu">No file open</span>';$('#ed').innerHTML='<span class="mu">Open a text file from the Files tab.</span>';return}
+  $('#eh').innerHTML=esc(E.path)+(E.dirty?' <span class="wr">●</span>':'')+' <span class="mu">'+fmt(enc.encode(E.text).length)+'</span>';
+  $('#bsel').classList.toggle('on',E.ext);
+  const t=E.text,r=sel();let out='',dr=0;const cur=`<span class="cur" data-o="${E.cur}"></span>`;
+  for(const[s,e,c]of hl(t,lang())){
+    const pts=[...new Set([s,e,...[r&&r[0],r&&r[1],E.cur].filter(x=>x!=null&&x>s&&x<e)])].sort((a,b)=>a-b);
+    for(let i=0;i<pts.length-1;i++){
+      const x=pts[i],y=pts[i+1];if(x===E.cur&&!dr){out+=cur;dr=1}
+      out+=`<span class="${c}${r&&x>=r[0]&&y<=r[1]?' sl':''}" data-o="${x}">${esc(t.slice(x,y))}</span>`;
+    }
+  }
+  if(!dr)out+=cur;$('#ed').innerHTML=out+'\u200b';
+  $('#q').innerHTML=Q.length?Q.map((s,i)=>`<span class="chip${i===qi?' on':''}" data-q="${i}">${esc(s.replace(/\s+/g,' ').slice(0,24))}<b data-x="${i}">×</b></span>`).join(''):'<span class="mu">Clipboard queue empty — stays inside this page, never the OS clipboard</span>';
+  const c=$('#ed .cur'),w=$('#edw');
+  if(c){const a=c.getBoundingClientRect(),b=w.getBoundingClientRect();if(a.top<b.top)w.scrollTop-=b.top-a.top+10;else if(a.bottom>b.bottom)w.scrollTop+=a.bottom-b.bottom+10}
+}
+$('#edw').addEventListener('click',e=>{
+  if(!E)return;let i=at(e.clientX,e.clientY);if(i==null)i=E.text.length;
+  if(E.ext){if(E.anc==null)E.anc=E.cur}else E.anc=null;
+  E.cur=i;E.kb=true;updKb();draw();
+});
+$('#q').addEventListener('click',e=>{
+  const x=e.target.closest('[data-x]'),q=e.target.closest('[data-q]');
+  if(x){Q.splice(+x.dataset.x,1);qi=0}else if(q)qi=+q.dataset.q;draw();
+});
+$('#tb').addEventListener('click',async e=>{
+  const a=e.target.closest('[data-a]');if(!a||!E)return;const k=a.dataset.a;
+  if('lrudhetb'.includes(k)&&k.length===1)return mv(k);
+  if(k==='save')saveEd();
+  else if(k==='kb'){E.kb=!E.kb;updKb()}
+  else if(k==='undo'){const u=E.undo.pop();if(u){E.text=u[0];E.cur=u[1];E.anc=null;E.dirty=true;draw()}}
+  else if(k==='sel'){E.ext=!E.ext;if(E.ext&&E.anc==null)E.anc=E.cur;draw()}
+  else if(k==='all'){E.anc=0;E.cur=E.text.length;draw()}
+  else if(k==='copy')cc(0);else if(k==='cut')cc(1);
+  else if(k==='paste'){if(!Q.length)toast('Queue is empty');else ET.ins(Q[qi])}
+  else if(k==='close'){if(E.dirty&&!await ask('Discard unsaved edits?',{yn:1}))return;E=null;setTab('f')}
+});
+
+/* ---------- files tab ---------- */
+function drawF(){
+  const el=$('#pf');if(!V){el.innerHTML='<p class="mu">No vault open. Create or open one in the Vault tab.</p>';return}
+  const pre=cwd?cwd+'/':'',dirs=[],fl=[];
+  for(const d of V.dirs)if(d.startsWith(pre)&&!d.slice(pre.length).includes('/'))dirs.push(d.slice(pre.length));
+  for(const[p,b]of V.files)if(p.startsWith(pre)&&!p.slice(pre.length).includes('/'))fl.push([p.slice(pre.length),b.length]);
+  dirs.sort((a,b)=>a.localeCompare(b));fl.sort((a,b)=>a[0].localeCompare(b[0]));
+  const cr=cwd?cwd.split('/'):[];
+  let h=`<div class="crumb"><a data-d="">${esc(V.name)}</a>`+cr.map((c,i)=>` / <a data-d="${esc(cr.slice(0,i+1).join('/'))}">${esc(c)}</a>`).join('')+'</div>';
+  h+='<span class="b" data-b="nf">+ File</span><span class="b" data-b="nd">+ Folder</span><span class="b" data-b="up">Upload</span><div class="list">';
+  if(cwd)h+=`<div class="row" data-d="${esc(cr.slice(0,-1).join('/'))}"><span>📁</span><span class="nm">..</span></div>`;
+  for(const d of dirs)h+=`<div class="row" data-d="${esc(pre+d)}"><span>📁</span><span class="nm">${esc(d)}</span><span class="dots mu" data-m="d:${esc(pre+d)}">⋯</span></div>`;
+  for(const[n,s]of fl)h+=`<div class="row" data-fp="${esc(pre+n)}"><span>📄</span><span class="nm">${esc(n)}</span><span class="mu">${fmt(s)}</span><span class="dots mu" data-m="f:${esc(pre+n)}">⋯</span></div>`;
+  if(!dirs.length&&!fl.length)h+='<div class="row mu">Empty folder</div>';
+  el.innerHTML=h+'</div>';
+}
+async function addNode(dir){
+  const n=await ask(dir?'New folder name':'New file name');if(n==null)return;const p=(cwd?cwd+'/':'')+n;
+  if(!okName(n)||!okPath(p))return toast('Invalid name');if(V.files.has(p)||V.dirs.has(p))return toast('Already exists');
+  if(V.files.size+V.dirs.size>=MAXN)return toast('Too many entries');
+  if(dir)V.dirs.add(p);else V.files.set(p,new Uint8Array(0));V.dirty=true;drawF();if(!dir)openEd(p);
+}
+async function del(ty,p){
+  if(!await ask('Delete '+p+(ty==='d'?' and everything inside it?':'?'),{yn:1}))return;
+  const pre=p+'/';
+  if(ty==='f')V.files.delete(p);else{for(const k of[...V.files.keys()])if(k.startsWith(pre))V.files.delete(k);for(const d of[...V.dirs])if(d===p||d.startsWith(pre))V.dirs.delete(d)}
+  if(E&&(E.path===p||E.path.startsWith(pre)))E=null;
+  if(cwd===p||cwd.startsWith(pre))cwd=p.split('/').slice(0,-1).join('/');
+  V.dirty=true;drawF();
+}
+async function fmenu(ty,p){
+  const i=await ask(p,{items:ty==='f'?['Edit in editor','Download','Delete']:['Open folder','Delete folder']});
+  if(i==null)return;
+  if(ty==='d')return i===0?(cwd=p,drawF()):del('d',p);
+  if(i===0)openEd(p);else if(i===1)dl(new Blob([V.files.get(p)],{type:'application/octet-stream'}),p.split('/').pop());else del('f',p);
+}
+$('#pf').addEventListener('click',e=>{
+  const g=s=>e.target.closest(s);let x;
+  if(x=g('[data-m]')){const v=x.dataset.m;return fmenu(v[0],v.slice(2))}
+  if(x=g('[data-fp]'))return openEd(x.dataset.fp);
+  if(x=g('[data-d]')){cwd=x.dataset.d;return drawF()}
+  if(x=g('[data-b]')){const b=x.dataset.b;if(b==='up')$('#fu').click();else addNode(b==='nd')}
+});
+$('#fu').onchange=async e=>{
+  const fs=[...e.target.files];e.target.value='';let n=0;
+  for(const f of fs){
+    const p=(cwd?cwd+'/':'')+f.name;
+    if(!okName(f.name)||!okPath(p)||V.dirs.has(p)){toast('Skipped '+f.name+' (bad name)');continue}
+    const old=V.files.get(p);if(f.size+used()-(old?old.length:0)+8+enc.encode(p).length>MAXV){toast('Skipped '+f.name+': vault would exceed 100 MB');continue}
+    if(!old&&V.files.size+V.dirs.size>=MAXN)break;
+    V.files.set(p,new Uint8Array(await f.arrayBuffer()));n++;
+  }
+  if(n){V.dirty=true;toast('Uploaded '+n+' file(s)')}drawF();
+};
+
+/* ---------- vault tab ---------- */
+function setV(o){V=o;E=null;cwd='';Q.length=0;qi=0;drawV();drawF();draw()}
+function drawV(){
+  let h='<h3>Vault</h3>';
+  if(V){const u=used();
+    h+=`<div class="card2"><b>${esc(V.name)}</b> ${V.dirty?'<span class="wr">● unsaved changes</span>':''}<div class="mu">${V.files.size} files, ${V.dirs.size} folders, ${fmt(u)} of 100 MB</div><div class="bar"><i style="width:${Math.min(100,u/MAXV*100)}%"></i></div><div class="mu">AES-256-GCM, PBKDF2-SHA512 ×${V.it.toLocaleString()}</div></div>`}
+  else h+='<p class="mu">No vault open. Nothing is kept on this device; contents live in memory until you save an encrypted file.</p>';
+  h+='<span class="b" data-v="new">New vault</span><span class="b" data-v="open">Open vault…</span>';
+  if(V)h+='<span class="b p" data-v="save">Save vault</span><span class="b" data-v="pw">Change password</span><span class="b d" data-v="lock">Lock &amp; wipe</span>';
+  $('#pv').innerHTML=h+'<p class="mu">Saving writes one encrypted .hvlt file via the iOS share/download sheet. Use a long passphrase: it is the only thing protecting the vault.</p>';
+}
+async function newPw(label){
+  const a=await ask(label+' (min 10 characters)',{secret:1});if(a==null)return null;
+  if([...a].length<10){toast('Password too short');return null}
+  const b=await ask('Repeat password',{secret:1});if(b!==a){toast(b==null?'Cancelled':'Passwords differ');return null}
+  return a;
+}
+$('#pv').addEventListener('click',async e=>{
+  const x=e.target.closest('[data-v]');if(!x)return;const k=x.dataset.v;
+  if(k==='open')return $('#fv').click();
+  if(k==='new'){
+    if(V&&V.dirty&&!await ask('Discard unsaved changes in the current vault?',{yn:1}))return;
+    const pw=await newPw('New password');if(pw)setV({files:new Map(),dirs:new Set(),pw,it:ITER,name:'vault',dirty:true});
+  }else if(k==='pw'){const pw=await newPw('New password');if(pw){V.pw=pw;V.dirty=true;drawV();toast('Password changed. Save the vault to apply it.')}}
+  else if(k==='lock'){if(V.dirty&&!await ask('Wipe vault from memory? Unsaved changes will be lost.',{yn:1}))return;setV(null)}
+  else if(k==='save'){
+    const n=await ask('Save as (file name)',{value:V.name});if(n==null)return;if(!okName(n))return toast('Invalid file name');
+    let blob;await busy('Encrypting…');try{blob=await seal()}catch(err){toast(err.message)}await busy();
+    if(!blob)return;
+    if(await ask('Encrypted: '+fmt(blob.size),{items:['Download '+n+'.hvlt']})===0){dl(blob,n+'.hvlt');V.name=n;V.dirty=false;drawV();drawF()}
+  }
+});
+$('#fv').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(f.size>MAXV+HL+16)return toast('File is larger than any valid vault');
+  if(V&&V.dirty&&!await ask('Discard unsaved changes in the current vault?',{yn:1}))return;
+  const buf=new Uint8Array(await f.arrayBuffer()),pw=await ask('Vault password',{secret:1});if(pw==null)return;
+  await busy('Deriving key…');
+  try{const r=await unseal(buf,pw);setV({...r,pw,name:f.name.replace(/\.hvlt$/i,'')||'vault',dirty:false})}catch(err){toast(err.message)}
+  await busy();
+};
+
+/* ---------- shell ---------- */
+function setTab(t){
+  tab=t;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  document.querySelectorAll('.pg').forEach(x=>x.classList.toggle('on',x.id==='p'+t));
+  if(t==='f')drawF();if(t==='v')drawV();if(t==='e')draw();updKb();
+}
+$('#tabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(t)setTab(t.dataset.t)});
+['copy','cut','paste','contextmenu','dragstart','selectstart'].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),true));
+document.addEventListener('selectionchange',()=>{const s=getSelection();if(s&&s.rangeCount)s.removeAllRanges()});
+drawV();drawF();draw();
+</script></body></html>
