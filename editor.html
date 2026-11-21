@@ -1,0 +1,420 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<!-- Build step: after editing the style or script block, recompute both sha256 hashes in the CSP (base64 of the exact text between the tags). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-U6sDkZnlFkAWpCEf1SKbrNwpTtIVJ1M2ivkALRuxrxo='; style-src 'sha256-5ApDjfFOUQTCRpt83Mk6fw24x28sIKsVT0pKqxJqfj0='; base-uri 'none'; form-action 'none'; trusted-types app; require-trusted-types-for 'script'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Secure Editor v0.1</title>
+<style>
+:root{color-scheme:dark;--bg:#000;--fg:#d8d8d8;--bd:#2a2e35;--ac:#264f78;--mono:ui-monospace,Menlo,monospace;--kh:min(42px,6.2vh);box-sizing:border-box;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+@supports(height:100dvh){:root{--kh:min(42px,6.2dvh)}}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);touch-action:manipulation;font:14px -apple-system,system-ui,sans-serif}
+@supports(height:100dvh){html{height:100dvh}}
+body{display:flex;flex-direction:column;overflow:hidden}
+/* toolbars + buttons */
+.tb{display:flex;flex-wrap:wrap;gap:3px;padding:3px;flex:none}
+.b{flex:1 0 auto;padding:7px 5px;background:#23272e;color:#ddd;border:1px solid var(--bd);border-radius:6px;font:inherit}
+.b.on{background:#2d6cdf;color:#fff}.b.wn{background:#a33;color:#fff}
+.tb.n{flex-wrap:nowrap}.tb.n .b{flex:1 1 0;min-width:0;padding:8px 1px;font-size:13px}
+#st{display:flex;justify-content:space-between;gap:8px;padding:2px 6px;font-size:12px;flex:none}
+#sz{color:#9ab;white-space:nowrap}
+/* side panel: only the lists scroll, toolbars stay reachable */
+#pn,#ph,#pg{display:flex;flex-direction:column;min-height:0}
+#pn{flex:none;max-height:32vh;border-block:1px solid var(--bd);background:#0c0e11}
+#ph,#pg{flex:1 1 auto}
+#hl,#gres{flex:1 1 auto;min-height:0;overflow:auto}
+.it{padding:5px 8px;border-bottom:1px solid #1a1d22;font:13px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it.on{background:var(--ac)}.dim{color:#778;padding:6px;flex:none}
+@supports(height:100dvh){#pn{max-height:32dvh}}
+.lab{align-self:center;padding:0 4px;color:#9ab}
+.fld{flex:3 1 120px;min-height:32px;min-width:0;padding:6px;border:1px solid var(--bd);border-radius:6px;background:#111;font:15px var(--mono);white-space:pre;overflow-x:auto;overflow-y:hidden;position:relative;scrollbar-width:none}
+.fld::-webkit-scrollbar{display:none}.fld.on{border-color:#2d6cdf}
+.mk{display:inline-block;width:1ch;text-align:center}
+.m{position:absolute;left:0;top:0;visibility:hidden;white-space:pre;font:15px var(--mono)}
+/* editor */
+#ed{flex:1;min-height:60px;overflow:auto;padding:6px 2ch;font:15px/1.4 var(--mono);white-space:pre-wrap;word-break:break-all;tab-size:2;-webkit-overflow-scrolling:touch;background:#000;color:#ddd}
+i.cur{display:inline-block;width:0;height:1.15em;border-left:2px solid #fff;vertical-align:text-bottom;margin-right:-2px;animation:bl 1s steps(1) infinite}
+i.cur.off{visibility:hidden}
+@keyframes bl{50%{opacity:0}}
+.bd{font-weight:700}.bo{color:#ff9f3a}.bp{color:#b98cff}.nl{color:#4a4f58}.un{color:#c66;background:#2a1414}
+.cd{background:#12171d;color:#9fb1c4}.tab{background:linear-gradient(#0000 85%,#555 85%)}
+.tB,.tG,.tR{text-decoration:underline}.tB{color:#4f9bff}.tG{color:#43dc78}.tR{color:#ff5555}
+.s{background:var(--ac)}
+.tab.s{background:linear-gradient(#0000 85%,#555 85%),var(--ac)}
+.hd{position:relative;padding-right:3ch}.hd.fo{background:#3a3200;color:#c8b24a}
+.tri{position:absolute;top:0;right:0;width:3ch;height:1.4em;cursor:pointer;text-align:center;color:#ffd21f;font-style:normal}
+/* on-screen keyboard */
+#kb{position:relative;z-index:10;background:#1b1d22;padding:5px 3px;display:flex;flex-direction:column;gap:6px;flex:none}
+.r{display:flex;gap:4px}
+.k{height:var(--kh);border-radius:5px;border:0;background:#4a4e57;color:#fff;font:19px system-ui;padding:0;min-width:0}
+.k.f{background:#2e3138;font-size:14px}.k.on{background:#2d6cdf}
+.sc{height:var(--kh)}
+#rot{display:none;position:fixed;inset:0;z-index:100;background:#000;color:#9ab;align-items:center;justify-content:center;font-size:18px;text-align:center;padding:24px}
+@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){#rot{display:flex}}
+</style>
+</head><body>
+<span id="cw" class="m">00000000000000000000</span>
+<div id="rot">Rotate your device to portrait</div>
+<div class="tb n"><button class="b on" id="kbb" data-a="kb">Kbd</button><button class="b" data-a="l">◀</button><button class="b" data-a="r">▶</button><button class="b" data-a="all">All</button><button class="b" data-a="undo">Undo</button><button class="b" data-a="redo">Redo</button></div>
+<div class="tb n"><button class="b" data-a="copy">Copy</button><button class="b" data-a="cut">Cut</button><button class="b" data-a="paste">Paste</button><button class="b" data-a="clip">Clips</button><button class="b" data-a="grep">Grep</button><button class="b" id="selb" data-a="sel">Select</button></div>
+<div id="st"><span id="msg"></span><span id="sz"></span></div>
+<div id="pn" hidden>
+ <div id="ph">
+  <div class="tb"><button class="b" data-a="ex">Export ⇧</button><button class="b" data-a="im">Import ⇩</button><button class="b" id="delb" data-a="del">Delete</button><button class="b" id="clrb" data-a="clr">Clear</button></div>
+  <div class="tb"><span class="lab">Password</span><div class="fld" id="pf" data-f="pw"></div><button class="b" id="pwb" data-a="pwv">Show</button></div>
+  <div id="hl"></div>
+ </div>
+ <div id="pg" hidden>
+  <div class="tb"><div class="fld" id="gf" data-f="gr"></div><button class="b" data-a="go">Go</button><button class="b" id="cib" data-a="cs">Aa</button></div>
+  <div class="dim">Grep is read-only: results are discarded when this panel closes.</div>
+  <div id="gres"></div>
+ </div>
+</div>
+<div id="ed"></div>
+<div id="kb"></div>
+<script>
+'use strict';
+const MAX=102400,FMAX=256,$=id=>document.getElementById(id),enc=new TextEncoder();
+
+/* ---------- safe HTML sink ----------
+ Every innerHTML write passes chk(): after removing the few tags/attributes this app generates,
+ no '<', '>' or bare '&' may remain. Enforced by a Trusted Types policy where supported. */
+const TAG=/<(?:\/(?:span|div|i|b|button)|(?:span|div|i|b|button)(?: (?:class|data-[a-z]+)="(?:[^"<>&]|&(?:amp|lt|gt|quot|#39);)*")*)>/g;
+const BADCH=/[<>]|&(?!(?:amp|lt|gt|quot|#39);)/;
+const chk=s=>{if(BADCH.test(s.replace(TAG,'')))throw new Error('Refused to render unexpected HTML');return s};
+const TP=window.trustedTypes?trustedTypes.createPolicy('app',{createHTML:chk}):null;
+const setH=(el,s)=>{el.innerHTML=TP?TP.createHTML(s):chk(s)};
+const ESC={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>ESC[c]);
+
+/* ---------- state ---------- */
+const S={text:'# Secure editor v0.1\n- item\n* item\n## Sub section\n[blue] <green> {red}\n[{inner}] [{no]}\n```\ncode block [x]\n```\nunknown: é\n',
+ c:0,a:0,sel:false,t:'ed',shift:0,mode:'L',kb:true,p:null,hs:0,cs:false,rv:false};
+let FD=new Set(),U=[],R=[],H=[],GR=[],busy=false,dirty=false,jobMsg='',msgTimer;
+const F={pw:'',gr:''},FC={pw:0,gr:0},FID={pw:'pf',gr:'gf'};
+
+let BL={t:null,n:0};
+const blen=s=>BL.t===s?BL.n:(BL={t:s,n:enc.encode(s).length}).n;
+
+function msg(m,bad,sticky){clearTimeout(msgTimer);const e=$('msg');e.textContent=m;e.style.color=bad?'#f77':'#9c9';
+ if(m&&!sticky)msgTimer=setTimeout(showBase,bad?6000:4000)}
+function showBase(){const e=$('msg');e.textContent=jobMsg;e.style.color='#9c9'}
+
+/* ---------- line scanner ----------
+ One cached pass over the text, shared by folding and highlighting.
+ Line kinds: 'f' bare ``` fence, 'c' inside a code block, 'h' heading, '' ordinary.
+ Each heading also gets p = offset where its section ends (next heading of <= level, or EOF). */
+const OPEN={'[':[']',16],'<':['>',32],'{':['}',64]},CLOSE=']>}',CN=[];
+const cls=m=>CN[m]??(CN[m]=['bd','bo','bp','cd','tB','tG','tR'].filter((_,j)=>m>>j&1).join(' '));
+let LC={t:null};
+function scan(){
+ const t=S.text;if(LC.t===t)return LC;
+ const lines=[],heads=[],byOff=new Map(),stack=[];let off=0,code=false;
+ for(const s of t.split('\n')){
+  const L={s,o:off,e:off+s.length,k:''};
+  if(s==='```'){L.k='f';code=!code}
+  else if(code)L.k='c';
+  else{const m=/^(#{1,6})( |$)/.exec(s);
+   if(m){L.k='h';L.lv=m[1].length;L.i=heads.length;L.p=t.length;
+    while(stack.length&&stack.at(-1).lv>=L.lv)stack.pop().p=L.o;
+    stack.push(L);heads.push(L);byOff.set(L.o,L)}}
+  lines.push(L);off=L.e+1}
+ return LC={t,l:lines,h:heads,by:byOff,cl:null}}
+
+function styles(){
+ const c=scan();if(c.cl)return c.cl;
+ const t=c.t,cl=c.cl=new Uint8Array(t.length+2);
+ for(const L of c.l){
+  if(L.k==='f'||L.k==='c'){cl.fill(8,L.o,L.e+1);continue}
+  if(L.k==='h')cl.fill(1,L.o,L.e);
+  const m=/^(\s*)([*-])\s/.exec(L.s);if(m)cl[L.o+m[1].length]|=m[2]==='*'?2:4;
+  let open=null,from=0;
+  for(let i=L.o;i<L.e;i++){const ch=t[i];
+   if(OPEN[ch]){open=OPEN[ch];from=i}
+   else if(open&&ch===open[0]){for(let k=from;k<=i;k++)cl[k]|=open[1];open=null}
+   else if(CLOSE.includes(ch))open=null}}
+ return cl}
+
+/* ---------- folding model ----------
+ A fold exists only for a heading whose hidden range (lo..hi) is non-empty; FD stores heading offsets and
+ folds() re-validates them on every use.
+ I1 FD never holds a stale/empty fold (prune).
+ I2 Cursor/anchor are never inside hidden text (fix); a non-empty selection may end at 0/len.
+ I3 Hidden text is only edited when the edit covers the whole fold block (repl refuses otherwise).
+ I4 An edit can only make folds disappear, never hide other text (a fold survives only if its heading and body are unchanged).
+ I5 Undo/redo restore the saved fold state; grep-goto unfolds just the folds covering the target.
+ I6 Arrow keys skip hidden text; tapping a fold marker never moves the view. */
+function span(x){const t=S.text,n=t.length;return{lo:x.e+1,hi:(x.p<n||t[n-1]==='\n')?x.p-1:n,p:x.p}}
+function folds(){const out=[];
+ for(const o of FD){const x=scan().by.get(o);if(!x)continue;const s=span(x);if(s.lo<=s.hi)out.push({x,...s})}
+ return out}
+const prune=()=>{FD=new Set(folds().map(f=>f.x.o))};
+function hidRange(i){let r=null;for(const f of folds())if(i>=f.lo&&i<=f.hi&&(!r||f.lo<r.lo))r=f;return r}
+function vis(i){let r;while(r=hidRange(i))i=r.lo-1;return i}
+function skip(i,d){let r;while(r=hidRange(i))i=d>0?r.hi+1:r.lo-1;return Math.min(i,S.text.length)}
+function fix(){prune();const n=S.text.length,ex=S.a!==S.c,f=i=>ex&&(i===0||i===n)?i:vis(i);
+ S.a=f(Math.min(S.a,n));S.c=f(Math.min(S.c,n))}
+function reveal(i){let r;while(r=hidRange(i))FD.delete(r.x.o);prune()}
+function toggle(o){const x=scan().by.get(o);if(!x)return;
+ if(FD.has(o))FD.delete(o);else{const s=span(x);if(s.lo<=s.hi)FD.add(o)}
+ fix();render(false);
+ /* Repaint kick: the DOM is already correct here, but some engines leave stale pixels of the removed lines in the scroller (they vanish on any relayout). */
+ const ed=$('ed'),st=ed.scrollTop;ed.style.display='none';void ed.offsetHeight;ed.style.display='';ed.scrollTop=st}
+
+/* ---------- rendering ---------- */
+function render(scroll=true){
+ const ed=$('ed'),keep=ed.scrollTop,t=S.text,n=t.length,cl=styles(),lines=scan().l,
+  a=Math.min(S.a,S.c),b=Math.max(S.a,S.c);
+ let h='',buf='',key=null,start=0,lens='';
+ const flush=()=>{if(buf)h+=`<span class="${key}" data-i="${start}"${lens.includes('2')?` data-l="${lens}"`:''}>${buf}</span>`;buf='';lens=''};
+ const row=(o0,e,block)=>{
+  key=null;
+  for(let i=o0;i<=e;){
+   if(i===S.c){flush();key=null;h+=`<i class="cur${S.t==='ed'?'':' off'}"></i>`}
+   if(i===n)break;
+   const cp=t.codePointAt(i),len=cp>0xffff?2:1,ch=t.slice(i,i+len);
+   let k=cls(cl[i])+(i>=a&&i<b?' s':''),o;
+   if(ch==='\n'){o=block?'¶':'¶\n';k+=block?' nl nb':' nl'}
+   else if(ch==='\t'){o='\t';k+=' tab'}
+   else if(cp>=32&&cp<127)o=esc(ch);
+   else{o='▯';k+=' un'}
+   if(k!==key){flush();key=k;start=i}
+   buf+=o;lens+=len;i+=len}
+  flush();key=null};
+ for(let li=0;li<lines.length;){
+  const L=lines[li];
+  if(L.k==='h'){
+   const s=span(L),has=s.lo<=s.hi,fo=has&&FD.has(L.o);
+   h+=`<div class="hd${fo?' fo':''}">${has?`<b class="tri" data-o="${L.o}">${fo?'▶':'▼'}</b>`:''}`;
+   row(L.o,L.e,true);h+='</div>';
+   if(fo)while(li<lines.length&&lines[li].o<s.p)li++;else li++;
+   continue}
+  row(L.o,L.e,false);li++}
+ setH(ed,h);
+ const z=blen(t);$('sz').textContent=`${z.toLocaleString()} / ${MAX.toLocaleString()} B`;
+ $('sz').style.color=z>MAX*.95?'#f77':'#9ab';
+ const cu=ed.querySelector('.cur');
+ if(scroll&&cu)cu.scrollIntoView({block:'nearest'});else ed.scrollTop=keep}
+
+/* ---------- editing core ---------- */
+const sl=i=>i>1&&S.text.codePointAt(i-2)>0xffff?i-2:Math.max(0,i-1);
+const sr=i=>Math.min(S.text.length,i+(S.text.codePointAt(i)>0xffff?2:1));
+const bd=i=>{const n=S.text.length;i=Math.max(0,Math.min(n,i));return i>0&&i<n&&S.text.codePointAt(i-1)>0xffff?i-1:i};
+const ab=()=>[Math.min(S.a,S.c),Math.max(S.a,S.c)];
+const curState=()=>[S.text,S.c,S.a,new Set(FD)];
+function load(u){S.text=u[0];FD=new Set(u[3]);S.c=bd(u[1]);S.a=bd(u[2]);fix();render()}
+function snap(){dirty=true;U.push(curState());R=[];if(U.length>100)U.shift()}
+const clean=s=>s.replace(/\r\n?/g,'\n').replace(/[\ud800-\udbff][\udc00-\udfff]|[\ud800-\udfff]/g,m=>m.length===2?m:'\ufffd');
+const ro=()=>{msg('Editor is read-only while Grep is open (tap the pattern field to type, or close Grep)',1);return false};
+const nofld=()=>{if(S.t==='ed')return false;msg('Not available in a text field – tap the editor first',1);return true};
+const ED=f=>(...a)=>{if(!nofld())return f(...a)};   /* editor-only action */
+
+function repl(a,b,s){
+ if(S.p==='g')return ro();
+ s=clean(s);
+ const nt=S.text.slice(0,a)+s+S.text.slice(b),fs=folds();
+ for(const f of fs)if(a<=f.hi&&b>f.lo&&!(a<=f.x.o&&b>=f.p)){msg('Edit would change folded text – unfold it first',1);return false}
+ if(blen(nt)>MAX){msg('Size limit (100 KB) reached – not applied',1);return false}
+ const d=s.length-(b-a),pre=fs.map(f=>({o:f.x.o,e:f.x.e,hi:f.hi,body:S.text.slice(f.lo,f.hi+1)}));
+ snap();S.text=nt;
+ const keep=new Set();
+ for(const f of pre){   /* a fold survives only if its heading still exists and its hidden text is unchanged */
+  let o2=null;
+  if(a>f.hi)o2=f.o;else if(f.o>=b)o2=f.o+d;else if(f.o<=a&&b<=f.e)o2=f.o;
+  const x=o2==null?null:scan().by.get(o2);if(!x)continue;
+  const sp=span(x);if(sp.lo<=sp.hi&&S.text.slice(sp.lo,sp.hi+1)===f.body)keep.add(o2)}
+ FD=keep;S.c=S.a=a+s.length;fix();render();return true}
+function mv(c){S.c=bd(c);if(!S.sel)S.a=S.c;fix();render()}
+function typ(s){if(S.t==='ed'){const[a,b]=ab();repl(a,b,s)}else ftyp(s)}
+function bsp(){
+ if(S.t!=='ed')return fbs();
+ const[a,b]=ab();if(a<b){repl(a,b,'');return}
+ if(S.c===0)return;
+ const p=sl(S.c);if(hidRange(p))return msg('Next to a folded section – unfold it first',1);
+ repl(p,S.c,'')}
+
+/* ---------- single-line fields (password, grep) ---------- */
+const px=v=>parseFloat(v)||0,charW=()=>$('cw').getBoundingClientRect().width/20||9;
+function fidx(k,x){const el=$(FID[k]),cs=getComputedStyle(el),l=el.getBoundingClientRect().left+px(cs.borderLeftWidth)+px(cs.paddingLeft);
+ return Math.max(0,Math.min(F[k].length,Math.round((x-l+el.scrollLeft)/charW())))}
+const fc=k=>FC[k]=Math.min(FC[k],F[k].length);
+function ftyp(s){const k=S.t,c=fc(k);if(F[k].length+s.length>FMAX)return msg('Field is full',1);
+ F[k]=F[k].slice(0,c)+s+F[k].slice(c);FC[k]=c+s.length;rf()}
+function fbs(){const k=S.t,c=fc(k);if(!c)return;F[k]=F[k].slice(0,c-1)+F[k].slice(c);FC[k]=c-1;rf()}
+function fmove(d){const k=S.t;FC[k]=Math.max(0,Math.min(F[k].length,fc(k)+d));rf()}
+const fv=(k,s)=>k==='pw'&&!S.rv?'<span class="mk">•</span>'.repeat(s.length):esc(s);
+function rf(){
+ for(const k of['gr','pw']){
+  const v=F[k],c=fc(k),el=$(FID[k]),on=S.t===k;
+  setH(el,on?fv(k,v.slice(0,c))+'<i class="cur"></i>'+fv(k,v.slice(c)):fv(k,v));
+  el.classList.toggle('on',on);
+  const cur=on&&el.clientWidth&&el.querySelector('.cur');   /* keep the caret in view */
+  if(cur){const l=cur.offsetLeft,w=el.clientWidth;
+   if(l<el.scrollLeft+8)el.scrollLeft=Math.max(0,l-8);else if(l>el.scrollLeft+w-24)el.scrollLeft=l-w+24}}
+ $('ed').querySelector('.cur')?.classList.toggle('off',S.t!=='ed')}
+
+/* ---------- crypto: [ver=1][salt16][iv12][AES-GCM ct+tag], version byte authenticated as AAD ---------- */
+const VER=1,ITER=100000,HDR=29,rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+const fmtErr=m=>Object.assign(new Error(m),{name:'FormatError'});
+async function kdf(pw,salt){
+ const m=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveKey']);
+ return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:ITER,hash:'SHA-512'},m,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function encT(txt,pw){
+ const salt=rnd(16),iv=rnd(12),k=await kdf(pw,salt);
+ const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:Uint8Array.of(VER)},k,enc.encode(txt)));
+ const o=new Uint8Array(HDR+ct.length);o[0]=VER;o.set(salt,1);o.set(iv,17);o.set(ct,HDR);
+ let s='';for(let i=0;i<o.length;i+=8192)s+=String.fromCharCode.apply(null,o.subarray(i,i+8192));
+ return btoa(s)}
+const B64MAX=Math.ceil((HDR+16+MAX)/3)*4;
+function parseT(s){
+ if(s.length>2*B64MAX)throw fmtErr('size');
+ s=s.replace(/\s+/g,'');
+ if(s.length>B64MAX||s.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(s))throw fmtErr('format');
+ const d=Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+ if(d.length<HDR+16||d[0]!==VER)throw fmtErr('version');
+ return d}
+async function decT(d,pw){
+ const k=await kdf(pw,d.slice(1,17));
+ const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:d.slice(17,29),additionalData:Uint8Array.of(VER)},k,d.slice(HDR));
+ return new TextDecoder('utf-8',{fatal:true}).decode(p)}
+async function toClip(p){
+ if(window.ClipboardItem)await navigator.clipboard.write([new ClipboardItem({'text/plain':p.then(s=>new Blob([s],{type:'text/plain'}))})]);
+ else await navigator.clipboard.writeText(await p)}
+function errMsg(l,e){
+ const n=e&&e.name,noCrypto=!(window.crypto&&crypto.subtle);
+ const why=n==='OperationError'?'wrong password or corrupted data'
+  :n==='NotAllowedError'?'clipboard access denied'
+  :n==='FormatError'?'clipboard does not hold valid encrypted text'
+  :n==='TypeError'?(noCrypto?'WebCrypto unavailable (HTTPS required)':'decrypted data is not valid text')
+  :'unexpected error';
+ return `${l} failed: ${why}`}
+async function job(l,f){
+ if(busy)return msg('Busy – wait for the current operation to finish',1);
+ busy=true;jobMsg=l+'…';msg(jobMsg,0,true);
+ try{await f()}catch(e){msg(errMsg(l,e),1)}finally{busy=false;jobMsg=''}}
+function needPw(){if(F.pw)return false;msg('Type a password in the Password field first',1);S.t='pw';rf();return true}
+
+/* ---------- clipboard history ---------- */
+const pv=(s,lim=40)=>{let t=s.replace(/\n/g,'¶').replace(/\t/g,'→');if(t.length>lim)t=t.slice(0,lim)+'…';return t.replace(/[^\x20-\x7e¶→…]/g,'▯')};
+const LBL={del:'Delete',clr:'Clear'};let AR=null,armTimer;
+function disarm(){clearTimeout(armTimer);if(AR){const b=$(AR+'b');b.textContent=LBL[AR];b.classList.remove('wn')}AR=null}
+function conf(k,fn){   /* two-tap confirmation */
+ if(AR===k){disarm();fn();return}
+ disarm();AR=k;const b=$(k+'b');b.textContent='Tap again';b.classList.add('wn');armTimer=setTimeout(disarm,3000)}
+function addH(s){if(!s)return;dirty=true;H=H.filter(x=>x!==s);H.unshift(s);if(H.length>30)H.pop();S.hs=0;rh()}
+function rh(){disarm();
+ setH($('hl'),H.length?H.map((s,i)=>`<div class="it${i===S.hs?' on':''}" data-h="${i}">${i+1}. ${esc(pv(s))} <b>[${s.length}]</b></div>`).join(''):'<div class="dim">Clipboard history is empty</div>')}
+function panel(){
+ disarm();
+ if(S.p!=='h'&&S.rv){S.rv=false;$('pwb').textContent='Show'}
+ if(S.p!=='g'){GR=[];setH($('gres'),'')}
+ $('pn').hidden=!S.p;$('ph').hidden=S.p!=='h';$('pg').hidden=S.p!=='g';
+ S.t=S.p==='g'?'gr':(S.p==='h'&&S.t==='pw')?'pw':'ed';rf()}
+
+/* ---------- on-screen keyboard ---------- */
+function drawKb(){
+ const key=(label,val,flex,c,act)=>`<button class="k ${c||''}" data-w="${flex||1}" ${act?`data-a="${act}"`:`data-k="${esc(val)}"`}>${esc(label)}</button>`;
+ const gap=f=>`<div class="sc" data-w="${f}"></div>`;
+ const up=S.mode==='L'&&S.shift;
+ const keys=(s,f)=>[...s].map(c=>{const d=up?c.toUpperCase():c;return key(d,d,f)}).join('');
+ const bs=key('⌫',0,1.5,'f','bs');
+ const bottom=(mode,label)=>key(label,0,1.5,'f',mode)+key('tab',0,1.5,'f','tab')+key('space',' ',5)+key('return',0,2,'f','en');
+ const rows=S.mode==='L'
+  ?[keys('1234567890'),keys('qwertyuiop'),gap(.5)+keys('asdfghjkl')+gap(.5),key('⇧',0,1.5,S.shift?'f on':'f','sh')+keys('zxcvbnm')+bs,bottom('ms','123')]
+  :[keys('[]{}#%^*+='),keys('_\\|~<>`')+gap(3),keys('-/:;()$&@"'),gap(1.5)+keys(".,?!'",1.4)+bs,bottom('ml','ABC')];
+ setH($('kb'),rows.map(r=>`<div class="r">${r}</div>`).join(''));
+ $('kb').querySelectorAll('[data-w]').forEach(e=>{e.style.flex=e.dataset.w+' 1 0'})}
+
+/* ---------- actions ---------- */
+const ACT={
+ kb(){S.kb=!S.kb;$('kb').hidden=!S.kb;$('kbb').classList.toggle('on',S.kb)},
+ undo:ED(()=>{if(S.p==='g')return ro();const u=U.pop();if(!u)return msg('Nothing to undo',1);R.push(curState());load(u)}),
+ redo:ED(()=>{if(S.p==='g')return ro();const u=R.pop();if(!u)return msg('Nothing to redo',1);U.push(curState());load(u)}),
+ sel:ED(()=>{S.sel=!S.sel;if(!S.sel){S.a=S.c;fix()}$('selb').classList.toggle('on',S.sel);render()}),
+ l(){if(S.t!=='ed')return fmove(-1);const[a,b]=ab();if(!S.sel&&a!==b)return mv(a);mv(skip(sl(S.c),-1))},
+ r(){if(S.t!=='ed')return fmove(1);const[a,b]=ab();if(!S.sel&&a!==b)return mv(b);const t=skip(sr(S.c),1);mv(hidRange(t)?S.c:t)},
+ all:ED(()=>{S.a=0;S.c=S.text.length;fix();render()}),
+ copy:ED(()=>{const[a,b]=ab();if(a<b){addH(S.text.slice(a,b));msg('Copied to clipboard history')}else msg('Nothing selected',1)}),
+ cut:ED(()=>{const[a,b]=ab();if(a>=b)return msg('Nothing selected',1);const s=S.text.slice(a,b);if(repl(a,b,''))addH(s)}),
+ paste:ED(()=>{const s=H[S.hs];if(s==null)return msg('Clipboard history is empty',1);const[a,b]=ab();repl(a,b,s)}),
+ clip(){S.p=S.p==='h'?null:'h';panel();rh()},
+ grep(){S.p=S.p==='g'?null:'g';panel()},
+ cs(){S.cs=!S.cs;$('cib').classList.toggle('on',S.cs);msg(S.cs?'Search is case-sensitive':'Search ignores case')},
+ go(){
+  const note=(s,r=true)=>{if(r)GR=[];setH($('gres'),`<div class="dim">${s}</div>`)};
+  if(!F.gr)return note('Enter a pattern');
+  let re;try{re=new RegExp(F.gr,(S.cs?'':'i')+'ug')}catch{return note('Invalid regular expression')}
+  GR=[];const out=[];let more=false;
+  for(const[i,L]of scan().l.entries()){
+   let m=null;for(const q of L.s.matchAll(re))if(q[0].length){m=q;break}
+   if(!m)continue;
+   if(GR.length>=300){more=true;break}
+   const st=Math.max(0,m.index-12);
+   out.push(`<div class="it" data-g="${GR.length}">${i+1}: ${st?'…':''}${esc(pv(L.s.slice(st),50))}</div>`);
+   GR.push({i:L.o+m.index,n:m[0].length})}
+  setH($('gres'),out.join('')+(more?'<div class="dim">More than 300 matching lines – refine the pattern</div>':'')||'<div class="dim">No matches</div>')},
+ ex(){
+  if(needPw())return;const s=H[S.hs];if(s==null)return msg('Clipboard history is empty',1);const pw=F.pw;
+  job('Exporting',async()=>{await toClip(encT(s,pw));msg('Encrypted text placed on the OS clipboard')})},
+ im(){
+  if(needPw())return;if(!navigator.clipboard?.readText)return msg('Clipboard read unavailable',1);const pw=F.pw;
+  job('Importing',async()=>{const t=await decT(parseT(await navigator.clipboard.readText()),pw);if(!t)return msg('Decrypted text is empty – nothing imported',1);addH(t);msg('Imported into clipboard history')})},
+ del(){if(!H.length)return msg('Clipboard history is empty',1);conf('del',()=>{H.splice(S.hs,1);S.hs=0;rh()})},
+ clr(){if(!H.length)return msg('Clipboard history is empty',1);conf('clr',()=>{H=[];S.hs=0;rh()})},
+ pwv(){S.rv=!S.rv;$('pwb').textContent=S.rv?'Hide':'Show';rf()},
+ bs:bsp,
+ tab(){if(S.t==='ed')typ('\t')},
+ en(){if(S.t==='ed')typ('\n');else if(S.t==='gr')ACT.go();else{S.t='ed';rf()}},
+ sh(){S.shift=S.shift?0:1;drawKb()},
+ ms(){S.shift=0;S.mode='S';drawKb()},
+ ml(){S.mode='L';drawKb()}
+};
+function press(b){
+ const k=b.dataset.k,a=b.dataset.a;
+ if(a!=='del'&&a!=='clr')disarm();
+ if(k!==undefined){typ(k);if(S.mode==='L'&&S.shift===1&&/[A-Za-z]/.test(k)){S.shift=0;drawKb()}return}
+ ACT[a]?.()}
+
+/* ---------- input ----------
+ Actions run on click. Hold-to-repeat (⌫ ◀ ▶) is driven by pointerdown; once a repeat has fired, the click that ends the hold is swallowed. */
+let holdT,holdI,held=false;const REPEAT=['bs','l','r'],stopHold=()=>{clearTimeout(holdT);clearInterval(holdI)};
+document.addEventListener('pointerdown',e=>{
+ stopHold();held=false;
+ const b=e.target.closest('button');if(!b||e.button||!REPEAT.includes(b.dataset.a))return;
+ holdT=setTimeout(()=>{held=true;press(b);holdI=setInterval(()=>press(b),60)},400)});
+['pointerup','pointercancel'].forEach(t=>window.addEventListener(t,stopHold));
+window.addEventListener('blur',stopHold);
+
+function idxAt(x,y){   /* text index under a tap, or null */
+ let n,o;
+ if(document.caretPositionFromPoint){const p=document.caretPositionFromPoint(x,y);if(p){n=p.offsetNode;o=p.offset}}
+ else if(document.caretRangeFromPoint){const r=document.caretRangeFromPoint(x,y);if(r){n=r.startContainer;o=r.startOffset}}
+ const el=n&&(n.nodeType===3?n.parentElement:n),sp=el?.closest?.('span[data-i]');
+ if(!sp){const last=$('ed').lastElementChild;return last&&y>last.getBoundingClientRect().bottom?S.text.length:null}
+ if(n.nodeType!==3)o=o>0?sp.textContent.length:0;
+ const i0=+sp.dataset.i;
+ if(sp.classList.contains('nl'))return sp.classList.contains('nb')?i0:i0+(o>>1);
+ const lens=sp.dataset.l;   /* per-glyph UTF-16 lengths when the span holds astral characters */
+ if(lens){let d=0,m=i0;for(const c of lens){if(d>=o)break;d++;m+=+c}return m}
+ return i0+o}
+function goto(i,n){reveal(i);reveal(i+n);S.a=bd(i);S.c=bd(i+n);S.t='ed';fix();render();rf()}
+
+document.addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault()});
+document.addEventListener('click',e=>{
+ const b=e.target.closest('button');
+ if(b){b.blur();if(held){held=false;return}press(b);return}
+ const x=e.target.closest('.tri,.fld,.it,#ed');if(!x)return;
+ const d=x.dataset;
+ if(x.classList.contains('tri'))toggle(+d.o);
+ else if(d.f){S.t=d.f;FC[d.f]=fidx(d.f,e.clientX);rf()}
+ else if(d.h!==undefined){S.hs=+d.h;rh()}
+ else if(d.g!==undefined){const r=GR[+d.g];if(r)goto(r.i,r.n)}
+ else{S.t='ed';rf();const ix=idxAt(e.clientX,e.clientY);if(ix!=null)mv(ix)}});
+['contextmenu','dblclick'].forEach(t=>document.addEventListener(t,e=>e.preventDefault()));
+/* Nothing is persisted, so warn before closing/reloading. (Some mobile browsers ignore this.) */
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+try{screen.orientation.lock('portrait').catch(()=>{})}catch{}
+
+S.c=S.a=S.text.length;drawKb();render();rf();rh();
+</script></body></html>
